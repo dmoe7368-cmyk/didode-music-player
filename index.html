@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Didode - Music Player</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2b3617">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ============ HOME SCREEN ============ -->
+  <section class="screen active" id="screen-home">
+    <header class="top-bar">
+      <button class="icon-btn" id="menuBtn">☰</button>
+      <div class="top-bar-actions">
+        <button class="icon-btn">🔔</button>
+        <div class="avatar">🎧</div>
+      </div>
+    </header>
+
+    <div class="screen-content">
+      <h1 class="greeting">Good Morning<br><span>Melody 👋</span></h1>
+
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="Search songs, artists...">
+        <button class="filter-btn">⚙️</button>
+      </div>
+
+      <div class="hero-card" id="heroCard">
+        <div class="hero-text">
+          <span class="hero-tag">Today's Pick</span>
+          <h2 id="heroTitle">Loading...</h2>
+          <p id="heroSub">Fetching your library</p>
+        </div>
+        <button class="play-circle" id="heroPlayBtn">▶</button>
+      </div>
+
+      <div class="section-row">
+        <h3>Categories</h3><a href="#" class="see-all">See All</a>
+      </div>
+      <div class="category-scroll">
+        <div class="category-pill">🎵<span>Group A</span></div>
+        <div class="category-pill">🎧<span>Group B</span></div>
+        <div class="category-pill">🎸<span>Group C</span></div>
+        <div class="category-pill">📂<span>Local</span></div>
+      </div>
+
+      <div class="section-row">
+        <h3>Recently Played</h3><a href="#" class="see-all">See All</a>
+      </div>
+      <div class="song-list" id="recentList"></div>
+    </div>
+  </section>
+
+  <!-- ============ PLAYER SCREEN ============ -->
+  <section class="screen" id="screen-player">
+    <header class="top-bar">
+      <button class="icon-btn nav-back" data-target="screen-home">⌄</button>
+      <div class="now-playing-label">
+        <span>Now Playing</span>
+        <small id="nowPlayingSource">Playlist</small>
+      </div>
+      <button class="icon-btn">⋮</button>
+    </header>
+
+    <div class="screen-content">
+      <div class="artwork-wrap">
+        <img id="playerArtwork" src="assets/cover-a.svg" alt="cover">
+      </div>
+
+      <div class="track-info">
+        <div>
+          <h2 id="trackTitle">No track loaded</h2>
+          <p id="trackArtist">—</p>
+        </div>
+        <button class="icon-btn" id="likeBtn">🤍</button>
+      </div>
+
+      <div class="seek-row">
+        <span id="currentTime">0:00</span>
+        <input type="range" id="seekBar" value="0" min="0" max="100">
+        <span id="durationTime">0:00</span>
+      </div>
+
+      <div class="transport-row">
+        <button class="icon-btn" id="shuffleBtn">🔀</button>
+        <button class="icon-btn" id="prevBtn">⏮</button>
+        <button class="play-circle big" id="playPauseBtn">▶</button>
+        <button class="icon-btn" id="nextBtn">⏭</button>
+        <button class="icon-btn" id="repeatBtn">🔁</button>
+      </div>
+
+      <div class="volume-row">
+        <button class="icon-btn" id="muteBtn">🔊</button>
+        <input type="range" id="volumeSlider" min="0" max="100" value="100">
+      </div>
+
+      <audio id="audioEl"></audio>
+    </div>
+  </section>
+
+  <!-- ============ LIBRARY SCREEN ============ -->
+  <section class="screen" id="screen-library">
+    <header class="top-bar">
+      <h2>My Library</h2>
+      <div class="top-bar-actions">
+        <button class="icon-btn">🔍</button>
+        <label class="icon-btn upload-label" for="localFileInput">＋</label>
+        <input type="file" id="localFileInput" accept="audio/*" multiple hidden>
+      </div>
+    </header>
+
+    <div class="screen-content">
+      <div class="tab-row">
+        <button class="tab-btn active" data-tab="playlists">Playlists</button>
+        <button class="tab-btn" data-tab="songs">Songs</button>
+        <button class="tab-btn" data-tab="local">Local</button>
+      </div>
+
+      <div class="tab-panel active" id="panel-playlists">
+        <div class="playlist-row" data-group="FAV">
+          <img src="assets/cover-fav.svg" alt="">
+          <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
+          <span>▶</span>
+        </div>
+        <div class="playlist-row" data-group="A">
+          <img src="assets/cover-a.svg" alt="">
+          <div><strong>Group A (1-50)</strong><small id="countA">0 Songs</small></div>
+          <span>▶</span>
+        </div>
+        <div class="playlist-row" data-group="B">
+          <img src="assets/cover-b.svg" alt="">
+          <div><strong>Group B (51-100)</strong><small id="countB">0 Songs</small></div>
+          <span>▶</span>
+        </div>
+        <div class="playlist-row" data-group="C">
+          <img src="assets/cover-c.svg" alt="">
+          <div><strong>Group C (101-150)</strong><small id="countC">0 Songs</small></div>
+          <span>▶</span>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-songs">
+        <div class="song-list" id="allSongsList"><p class="status-text" id="driveStatus">Loading songs from Google Drive...</p></div>
+      </div>
+
+      <div class="tab-panel" id="panel-local">
+        <div class="song-list" id="localSongsList"><p class="status-text">No local songs uploaded yet.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BOTTOM NAV ============ -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-target="screen-home"><span>🏠</span>Home</button>
+    <button class="nav-btn" data-target="screen-player"><span>🎵</span>Player</button>
+    <button class="nav-btn" data-target="screen-library"><span>📚</span>Library</button>
+  </nav>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => {
+        console.warn("Service worker registration failed:", err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
