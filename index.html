@@ -1,157 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Didode - Music Player</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2b3617">
-<link rel="icon" href="assets/icons/icon-192.png">
-<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Didode Music Player</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#161e0e">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div class="app-shell">
 
   <!-- ============ HOME SCREEN ============ -->
-  <section class="screen active" id="screen-home">
-    <header class="top-bar">
-      <button class="icon-btn" id="menuBtn">☰</button>
-      <div class="top-bar-actions">
-        <button class="icon-btn">🔔</button>
-        <div class="avatar">🎧</div>
+  <section class="screen active" id="screen-home" aria-label="Home Screen">
+    <header class="top-bar-clean">
+      <div class="brand-title">
+        <h1>Didode Music</h1>
+      </div>
+      <div class="top-badge">
+        <span class="live-dot"></span> Online
       </div>
     </header>
 
-    <div class="screen-content">
-      <h1 class="greeting">Good Morning<br><span>Melody 👋</span></h1>
-
-      <div class="search-row">
-        <input type="text" id="searchInput" placeholder="Search songs, artists...">
-        <button class="filter-btn">⚙️</button>
-      </div>
-
-      <div class="hero-card" id="heroCard">
-        <div class="hero-text">
-          <span class="hero-tag">Today's Pick</span>
-          <h2 id="heroTitle">Loading...</h2>
-          <p id="heroSub">Fetching your library</p>
+    <div class="screen-content home-layout">
+      <!-- Top Fixed Section -->
+      <div class="home-fixed-section">
+        <div class="search-row">
+          <input type="text" id="searchInput" placeholder="Search songs or artists..." aria-label="Search songs">
         </div>
-        <button class="play-circle" id="heroPlayBtn">▶</button>
+
+        <div class="hero-card" id="heroCard" role="button" tabindex="0" aria-label="Play Featured Track">
+          <div class="hero-cover-wrap">
+            <img id="heroArtwork" src="assets/cover-a.png" alt="Featured Cover">
+          </div>
+          <div class="hero-text">
+            <h2 id="heroTitle">Connecting to Drive...</h2>
+            <p id="heroSub">Fetching music library</p>
+          </div>
+          <button class="play-circle" id="heroPlayBtn" aria-label="Play Track">▶</button>
+        </div>
+
+        <div class="section-row">
+          <h3>Playlists & Volumes</h3>
+        </div>
+        <div class="volume-carousel">
+          <div class="volume-card" data-group="A" role="button" tabindex="0">
+            <div class="vol-thumb">
+              <img src="assets/cover-a.png" alt="Volume A Cover">
+            </div>
+            <strong>Tracks 1 - 50</strong>
+            <small id="volCountA">0 Songs</small>
+          </div>
+
+          <div class="volume-card" data-group="B" role="button" tabindex="0">
+            <div class="vol-thumb">
+              <img src="assets/cover-b.png" alt="Volume B Cover">
+            </div>
+            <strong>Tracks 51 - 100</strong>
+            <small id="volCountB">0 Songs</small>
+          </div>
+
+          <div class="volume-card" data-group="C" role="button" tabindex="0">
+            <div class="vol-thumb">
+              <img src="assets/cover-c.png" alt="Volume C Cover">
+            </div>
+            <strong>Tracks 101 - 150</strong>
+            <small id="volCountC">0 Songs</small>
+          </div>
+
+          <div class="volume-card" data-group="LOCAL" role="button" tabindex="0">
+            <div class="vol-thumb local-thumb">
+              <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/cover-a.png';">
+            </div>
+            <strong>Device Files</strong>
+            <small id="volCountLocal">0 Files</small>
+          </div>
+        </div>
+
+        <div class="section-row">
+          <h3>Recently Played</h3>
+        </div>
       </div>
 
-      <div class="section-row">
-        <h3>Categories</h3><a href="#" class="see-all">See All</a>
+      <!-- Scrollable Recent List -->
+      <div class="home-scroll-section">
+        <div class="song-list" id="recentList"></div>
       </div>
-      <div class="category-scroll">
-        <div class="category-pill">🎵<span>Group A</span></div>
-        <div class="category-pill">🎧<span>Group B</span></div>
-        <div class="category-pill">🎸<span>Group C</span></div>
-        <div class="category-pill">📂<span>Local</span></div>
-      </div>
-
-      <div class="section-row">
-        <h3>Recently Played</h3><a href="#" class="see-all">See All</a>
-      </div>
-      <div class="song-list" id="recentList"></div>
     </div>
   </section>
 
   <!-- ============ PLAYER SCREEN ============ -->
-  <section class="screen" id="screen-player">
+  <section class="screen" id="screen-player" aria-label="Now Playing Screen">
     <header class="top-bar">
-      <button class="icon-btn nav-back" data-target="screen-home">⌄</button>
+      <button class="icon-btn nav-back" data-target="screen-home" aria-label="Back to Home">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
       <div class="now-playing-label">
         <span>Now Playing</span>
         <small id="nowPlayingSource">Playlist</small>
       </div>
-      <button class="icon-btn">⋮</button>
+      <div style="width: 42px;"></div>
     </header>
 
-    <div class="screen-content">
+    <div class="screen-content player-content">
       <div class="artwork-wrap">
-        <img id="playerArtwork" src="assets/cover-a.svg" alt="cover">
+        <img id="playerArtwork" src="assets/cover-a.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
+      </div>
+
+      <!-- Equalizer Visualizer Canvas -->
+      <div class="visualizer-container">
+        <canvas id="equalizerCanvas" width="320" height="38"></canvas>
       </div>
 
       <div class="track-info">
-        <div>
+        <div class="track-meta">
           <h2 id="trackTitle">No track loaded</h2>
           <p id="trackArtist">—</p>
         </div>
-        <button class="icon-btn" id="likeBtn">🤍</button>
+        <button class="icon-btn heart-btn" id="likeBtn" aria-label="Favorite Track">
+          <svg id="heartSvg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        </button>
       </div>
 
       <div class="seek-row">
         <span id="currentTime">0:00</span>
-        <input type="range" id="seekBar" value="0" min="0" max="100">
+        <input type="range" id="seekBar" value="0" min="0" max="100" aria-label="Seek playback">
         <span id="durationTime">0:00</span>
       </div>
 
       <div class="transport-row">
-        <button class="icon-btn" id="shuffleBtn">🔀</button>
-        <button class="icon-btn" id="prevBtn">⏮</button>
-        <button class="play-circle big" id="playPauseBtn">▶</button>
-        <button class="icon-btn" id="nextBtn">⏭</button>
-        <button class="icon-btn" id="repeatBtn">🔁</button>
+        <button class="icon-btn ctrl-btn" id="shuffleBtn" aria-label="Shuffle">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+        </button>
+        
+        <button class="icon-btn ctrl-btn" id="prevBtn" aria-label="Previous Track">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        
+        <button class="play-circle big" id="playPauseBtn" aria-label="Play or Pause">
+          <span id="playIcon">▶</span>
+        </button>
+        
+        <button class="icon-btn ctrl-btn" id="nextBtn" aria-label="Next Track">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
+        </button>
+        
+        <button class="icon-btn ctrl-btn" id="repeatBtn" aria-label="Repeat Mode">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </button>
       </div>
 
       <div class="volume-row">
-        <button class="icon-btn" id="muteBtn">🔊</button>
-        <input type="range" id="volumeSlider" min="0" max="100" value="100">
+        <button class="icon-btn vol-btn" id="muteBtn" aria-label="Mute Audio">
+          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </button>
+        <input type="range" id="volumeSlider" min="0" max="100" value="100" aria-label="Adjust Volume">
       </div>
 
-      <audio id="audioEl"></audio>
+      <!-- Pure Native Audio Output Element -->
+      <audio id="audioEl" preload="auto"></audio>
     </div>
   </section>
 
   <!-- ============ LIBRARY SCREEN ============ -->
-  <section class="screen" id="screen-library">
+  <section class="screen" id="screen-library" aria-label="Library Screen">
     <header class="top-bar">
       <h2>My Library</h2>
       <div class="top-bar-actions">
-        <button class="icon-btn">🔍</button>
-        <label class="icon-btn upload-label" for="localFileInput">＋</label>
-        <input type="file" id="localFileInput" accept="audio/*" multiple hidden>
+        <label class="icon-btn upload-label" for="localFileInput" title="Upload Audio Files" role="button" tabindex="0">＋</label>
+        <input type="file" id="localFileInput" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple style="display: none;">
       </div>
     </header>
 
     <div class="screen-content">
       <div class="tab-row">
-        <button class="tab-btn active" data-tab="playlists">Playlists</button>
-        <button class="tab-btn" data-tab="songs">Songs</button>
-        <button class="tab-btn" data-tab="local">Local</button>
+        <button class="tab-btn active" data-tab="playlists">Volumes</button>
+        <button class="tab-btn" data-tab="songs">All Songs</button>
+        <button class="tab-btn" data-tab="local">Local Files</button>
       </div>
 
       <div class="tab-panel active" id="panel-playlists">
         <div class="playlist-row" data-group="FAV">
-          <img src="assets/cover-fav.svg" alt="">
+          <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
           <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
           <span>▶</span>
         </div>
         <div class="playlist-row" data-group="A">
-          <img src="assets/cover-a.svg" alt="">
-          <div><strong>Group A (1-50)</strong><small id="countA">0 Songs</small></div>
+          <img src="assets/cover-a.png" alt="Volume A Cover">
+          <div><strong>Tracks 1 - 50</strong><small id="countA">0 Songs</small></div>
           <span>▶</span>
         </div>
         <div class="playlist-row" data-group="B">
-          <img src="assets/cover-b.svg" alt="">
-          <div><strong>Group B (51-100)</strong><small id="countB">0 Songs</small></div>
+          <img src="assets/cover-b.png" alt="Volume B Cover">
+          <div><strong>Tracks 51 - 100</strong><small id="countB">0 Songs</small></div>
           <span>▶</span>
         </div>
         <div class="playlist-row" data-group="C">
-          <img src="assets/cover-c.svg" alt="">
-          <div><strong>Group C (101-150)</strong><small id="countC">0 Songs</small></div>
+          <img src="assets/cover-c.png" alt="Volume C Cover">
+          <div><strong>Tracks 101 - 150</strong><small id="countC">0 Songs</small></div>
           <span>▶</span>
         </div>
       </div>
 
       <div class="tab-panel" id="panel-songs">
-        <div class="song-list" id="allSongsList"><p class="status-text" id="driveStatus">Loading songs from Google Drive...</p></div>
+        <div class="song-list" id="allSongsList">
+          <p class="status-text" id="driveStatus">Loading tracks from Google Drive...</p>
+        </div>
       </div>
 
       <div class="tab-panel" id="panel-local">
-        <div class="song-list" id="localSongsList"><p class="status-text">No local songs uploaded yet.</p></div>
+        <div class="local-upload-box" id="dropZone">
+          <label for="localFileInput" class="upload-cta-btn">
+            <span>📁 Select Audio Files</span>
+          </label>
+          <small>Supports MP3, M4A, WAV, AAC, FLAC</small>
+        </div>
+        <div class="song-list" id="localSongsList">
+          <p class="status-text" id="localEmptyStatus">No local songs uploaded yet.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -167,14 +236,5 @@
 
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
-<script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => {
-        console.warn("Service worker registration failed:", err);
-      });
-    });
-  }
-</script>
 </body>
 </html>
