@@ -1,5 +1,5 @@
 // =====================================================
-// Didode Music Player - Complete Integrated Engine
+// Didode Music Player - Universal Engine & Custom Dialogs
 // =====================================================
 
 const state = {
@@ -17,7 +17,44 @@ const state = {
 const audioEl = document.getElementById("audioEl");
 
 // -----------------------------------------------------
-// STABLE EQUALIZER VISUALIZER (Safe Decoupled Engine)
+// CUSTOM IN-APP CONFIRMATION DIALOG (No Browser Alert)
+// -----------------------------------------------------
+function showCustomConfirm(title, message, confirmText = "Confirm") {
+  return new Promise((resolve) => {
+    const modalBackdrop = document.getElementById("customModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalDesc = document.getElementById("modalDesc");
+    const confirmBtn = document.getElementById("modalConfirmBtn");
+    const cancelBtn = document.getElementById("modalCancelBtn");
+
+    if (!modalBackdrop || !confirmBtn || !cancelBtn) {
+      resolve(false);
+      return;
+    }
+
+    if (modalTitle) modalTitle.textContent = title;
+    if (modalDesc) modalDesc.textContent = message;
+    if (confirmBtn) confirmBtn.textContent = confirmText;
+
+    modalBackdrop.classList.add("active");
+
+    function cleanup(result) {
+      modalBackdrop.classList.remove("active");
+      confirmBtn.removeEventListener("click", onConfirm);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    }
+
+    function onConfirm() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+
+    confirmBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
+
+// -----------------------------------------------------
+// STABLE EQUALIZER VISUALIZER ENGINE
 // -----------------------------------------------------
 let animationFrameId = null;
 
@@ -91,7 +128,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 });
 
 // -----------------------------------------------------
-// SONG NUMBER & VOLUME COVER RESOLVER
+// NUMBER & VOLUME COVER RESOLVER
 // -----------------------------------------------------
 function extractSongNumber(filename) {
   const match = filename.match(/\d+/);
@@ -139,7 +176,6 @@ function getVolumeMetadata(group) {
   }
 }
 
-// Open and render volume detail list
 function openVolumeDetail(group) {
   const meta = getVolumeMetadata(group);
   const songs = getSongsForGroup(group);
@@ -154,7 +190,6 @@ function openVolumeDetail(group) {
   if (titleEl) titleEl.textContent = meta.title;
   if (subEl) subEl.textContent = `${songs.length} Tracks available`;
 
-  // Play All Button in Volume Detail
   if (playAllBtn) {
     playAllBtn.onclick = () => {
       if (songs.length) {
@@ -165,7 +200,6 @@ function openVolumeDetail(group) {
     };
   }
 
-  // Render songs list inside this volume
   if (listContainer) {
     listContainer.innerHTML = "";
     if (!songs.length) {
@@ -181,7 +215,6 @@ function openVolumeDetail(group) {
     }
   }
 
-  // Switch to Volume Detail Tab Panel inside Library
   showScreen("screen-library");
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
@@ -189,14 +222,12 @@ function openVolumeDetail(group) {
   if (detailPanel) detailPanel.classList.add("active");
 }
 
-// Back to Volumes button
 document.getElementById("backToVolumesBtn")?.addEventListener("click", () => {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.getElementById("panel-playlists")?.classList.add("active");
   document.querySelector('.tab-btn[data-tab="playlists"]')?.classList.add("active");
 });
 
-// Direct Play All from row arrow button
 function playVolumeDirectly(group, event) {
   if (event) event.stopPropagation();
   const songs = getSongsForGroup(group);
@@ -210,16 +241,13 @@ function playVolumeDirectly(group, event) {
   }
 }
 
-// Bind clicks for Volume rows in Library & Home Carousel
 document.querySelectorAll(".volume-card").forEach(el => {
   el.addEventListener("click", () => openVolumeDetail(el.dataset.group));
 });
 
 document.querySelectorAll(".playlist-row").forEach(el => {
-  // Row click opens the songs list of that volume
   el.addEventListener("click", () => openVolumeDetail(el.dataset.group));
 
-  // Play arrow button plays immediately
   const playBtn = el.querySelector(".row-play-btn");
   if (playBtn) {
     playBtn.addEventListener("click", (e) => playVolumeDirectly(el.dataset.group, e));
@@ -240,7 +268,7 @@ async function handleLocalFiles(files) {
   });
 
   if (!validAudioFiles.length) {
-    alert("Please select valid audio files (.mp3, .m4a, .wav, .aac, .flac)");
+    alert("Please select supported audio files (.mp3, .m4a, .wav, .aac, .flac)");
     return;
   }
 
@@ -251,7 +279,7 @@ async function handleLocalFiles(files) {
     const trackRecord = {
       id: trackId,
       name: cleanName,
-      blob: file, // Store raw audio permanently in IndexedDB
+      blob: file,
       cover: "assets/cover-local.png",
       group: "Local",
       isLocal: true
@@ -279,6 +307,14 @@ localFileInput?.addEventListener("change", (e) => {
 
 async function deleteLocalSong(songId, event) {
   if (event) event.stopPropagation();
+
+  // Custom In-App Modal instead of native browser confirm
+  const confirmed = await showCustomConfirm(
+    "Delete Track",
+    "Remove this track from your local storage?",
+    "Delete"
+  );
+  if (!confirmed) return;
 
   const songIndex = state.localSongs.findIndex(s => s.id === songId);
   if (songIndex === -1) return;
@@ -314,11 +350,16 @@ async function deleteLocalSong(songId, event) {
   updateLocalCount();
 }
 
+// Replaced GitHub Popup with Custom In-App Modal
 async function clearAllLocalSongs() {
   if (!state.localSongs.length) return;
 
-  const confirmClean = confirm("Permanently remove all saved local songs from this device?");
-  if (!confirmClean) return;
+  const confirmed = await showCustomConfirm(
+    "Clear All Local Tracks",
+    "Permanently remove all saved local songs from this device?",
+    "Clear All"
+  );
+  if (!confirmed) return;
 
   if (state.queue[state.currentIndex]?.isLocal) {
     audioEl.pause();
@@ -785,12 +826,11 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 });
 
 // -----------------------------------------------------
-// APP INIT & INDEXEDDB RESTORATION
+// APP INITIALIZATION & RE-HYDRATION
 // -----------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
   renderVisualizer();
 
-  // 1. Initialize IndexedDB & Re-hydrate Local Audio Blobs
   try {
     await initDB();
     const savedTracks = await getAllTracksFromDB();
@@ -800,14 +840,14 @@ window.addEventListener("DOMContentLoaded", async () => {
         ...t,
         url: URL.createObjectURL(t.blob)
       }));
+
       renderLocalSongs();
       updateLocalCount();
     }
   } catch (err) {
-    console.error("IndexedDB startup error:", err);
+    console.error("IndexedDB initialization failed:", err);
   }
 
-  // 2. Fetch Google Drive Songs
   if (window.DRIVE_CONFIG && window.DRIVE_CONFIG.autoLoad) {
     fetchDriveSongs();
   }
