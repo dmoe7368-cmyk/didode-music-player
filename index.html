@@ -184,35 +184,30 @@
 
       <!-- Panel: Volumes List -->
       <div class="tab-panel active" id="panel-playlists">
-        <!-- Favorites Row -->
         <div class="playlist-row" data-group="FAV">
           <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
           <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
           <button class="row-play-btn" data-play-group="FAV" title="Play All">▶</button>
         </div>
 
-        <!-- Volume A -->
         <div class="playlist-row" data-group="A">
           <img src="assets/cover-a.png" alt="Volume A Cover">
           <div><strong>Tracks 1 - 50</strong><small id="countA">0 Songs</small></div>
           <button class="row-play-btn" data-play-group="A" title="Play All">▶</button>
         </div>
 
-        <!-- Volume B -->
         <div class="playlist-row" data-group="B">
           <img src="assets/cover-b.png" alt="Volume B Cover">
           <div><strong>Tracks 51 - 100</strong><small id="countB">0 Songs</small></div>
           <button class="row-play-btn" data-play-group="B" title="Play All">▶</button>
         </div>
 
-        <!-- Volume C -->
         <div class="playlist-row" data-group="C">
           <img src="assets/cover-c.png" alt="Volume C Cover">
           <div><strong>Tracks 101 - 150</strong><small id="countC">0 Songs</small></div>
           <button class="row-play-btn" data-play-group="C" title="Play All">▶</button>
         </div>
 
-        <!-- Device Files / Local Row -->
         <div class="playlist-row" data-group="LOCAL">
           <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/cover-a.png';">
           <div><strong>Device Files (Local)</strong><small id="countLocal">0 Files</small></div>
@@ -220,7 +215,7 @@
         </div>
       </div>
 
-      <!-- Panel: Detailed Volume Songs Browser (Opens when tapping any volume) -->
+      <!-- Panel: Volume Drill-Down View -->
       <div class="tab-panel" id="panel-volume-detail">
         <div class="vol-detail-header">
           <button id="backToVolumesBtn" class="back-link">← Back to Volumes</button>
@@ -270,6 +265,19 @@
     <button class="nav-btn" data-target="screen-player"><span>🎵</span>Player</button>
     <button class="nav-btn" data-target="screen-library"><span>📚</span>Library</button>
   </nav>
+
+  <!-- ============ CUSTOM IN-APP CONFIRMATION MODAL ============ -->
+  <div class="custom-modal-backdrop" id="customModal">
+    <div class="custom-modal-box">
+      <div class="modal-icon">🗑️</div>
+      <h3 id="modalTitle">Clear All Local Tracks</h3>
+      <p id="modalDesc">Permanently remove all saved local songs from this device?</p>
+      <div class="modal-actions">
+        <button id="modalCancelBtn" class="modal-btn cancel-btn">Cancel</button>
+        <button id="modalConfirmBtn" class="modal-btn confirm-btn">Clear All</button>
+      </div>
+    </div>
+  </div>
 
 </div>
 
