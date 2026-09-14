@@ -7,6 +7,7 @@
   --text-muted: rgba(245, 248, 237, 0.62);
   --accent-lime: #b6f338;
   --accent-lime-glow: rgba(182, 243, 56, 0.45);
+  --danger: #ef4444;
   --radius-sm: 12px;
   --radius-md: 18px;
   --radius-lg: 24px;
@@ -295,7 +296,7 @@ html, body {
   color: var(--text-muted);
 }
 
-/* Song Rows */
+/* Song Rows & Action Buttons */
 .song-list {
   display: flex;
   flex-direction: column;
@@ -311,6 +312,11 @@ html, body {
   border-radius: var(--radius-md);
   padding: 8px 12px;
   cursor: pointer;
+  position: relative;
+  transition: background 0.15s ease;
+}
+.song-row:active {
+  background: rgba(255, 255, 255, 0.08);
 }
 .song-row img {
   width: 44px;
@@ -333,19 +339,45 @@ html, body {
   color: var(--text-muted);
   font-size: 12px;
 }
-.song-row button {
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.play-btn-item {
   background: none;
   border: none;
   color: var(--text-main);
   font-size: 16px;
+  cursor: pointer;
 }
 
-/* Local Upload Hero */
+/* Single Delete Button */
+.delete-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.delete-btn:active {
+  transform: scale(0.9);
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* Local Upload Box */
 .local-upload-box {
   background: var(--card-bg);
   border: 1px dashed var(--card-border);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 16px 14px;
   text-align: center;
   margin-bottom: 16px;
   display: flex;
@@ -353,12 +385,18 @@ html, body {
   align-items: center;
   gap: 8px;
 }
+.upload-btn-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .upload-cta-btn {
   background: var(--accent-lime);
   color: #0d1307;
   font-weight: 700;
-  font-size: 14px;
-  padding: 10px 20px;
+  font-size: 13px;
+  padding: 8px 18px;
   border-radius: 20px;
   cursor: pointer;
   display: inline-flex;
@@ -366,9 +404,129 @@ html, body {
   gap: 6px;
   box-shadow: 0 4px 14px var(--accent-lime-glow);
 }
+.clean-all-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.clean-all-btn:active {
+  background: rgba(239, 68, 68, 0.3);
+}
 .local-upload-box small {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+/* ===================================================
+   VOLUME DETAIL BROWSER (DRILL DOWN)
+   =================================================== */
+.vol-detail-header {
+  margin-bottom: 16px;
+}
+.back-link {
+  background: none;
+  border: none;
+  color: var(--accent-lime);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.vol-detail-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+.vol-detail-banner img {
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+.vol-detail-info h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.vol-detail-info p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.detail-play-all {
+  background: var(--accent-lime);
+  color: #0b0f07;
+  border: none;
+  border-radius: 18px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--accent-lime-glow);
+}
+
+/* Playlist Rows with Direct Play Option */
+.playlist-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.playlist-row:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+.playlist-row img {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #192211;
+}
+.playlist-row div {
+  flex: 1;
+}
+.playlist-row strong {
+  display: block;
+  font-size: 14px;
+}
+.playlist-row small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.row-play-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px;
+  transition: color 0.15s ease;
+}
+.row-play-btn:hover {
+  color: var(--accent-lime);
 }
 
 /* Player Screen */
@@ -390,6 +548,7 @@ html, body {
   color: var(--text-muted);
   font-size: 11px;
 }
+
 .artwork-wrap {
   display: flex;
   justify-content: center;
@@ -403,6 +562,7 @@ html, body {
   object-fit: cover;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
+
 .visualizer-container {
   display: flex;
   justify-content: center;
@@ -414,6 +574,7 @@ html, body {
   max-width: 280px;
   height: 38px;
 }
+
 .track-info {
   display: flex;
   justify-content: space-between;
@@ -432,6 +593,7 @@ html, body {
   fill: #ff3366;
   stroke: #ff3366;
 }
+
 .seek-row {
   display: flex;
   align-items: center;
@@ -445,6 +607,7 @@ html, body {
   accent-color: var(--accent-lime);
   cursor: pointer;
 }
+
 .transport-row {
   display: flex;
   align-items: center;
@@ -463,6 +626,7 @@ html, body {
   background: rgba(182, 243, 56, 0.15);
   box-shadow: 0 0 12px var(--accent-lime-glow);
 }
+
 .volume-row {
   display: flex;
   align-items: center;
@@ -486,7 +650,7 @@ html, body {
   cursor: pointer;
 }
 
-/* Library Screen */
+/* Library Tabs */
 .tab-row {
   display: flex;
   gap: 10px;
@@ -513,35 +677,6 @@ html, body {
 }
 .tab-panel.active {
   display: block;
-}
-.playlist-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-.playlist-row img {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
-  object-fit: cover;
-  background: #192211;
-}
-.playlist-row div {
-  flex: 1;
-}
-.playlist-row strong {
-  display: block;
-  font-size: 14px;
-}
-.playlist-row small {
-  color: var(--text-muted);
-  font-size: 12px;
 }
 
 /* Bottom Nav */
