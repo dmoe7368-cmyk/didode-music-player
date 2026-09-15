@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Didode Music Player</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#161e0e">
+  <meta name="theme-color" content="#090d05">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
@@ -26,13 +26,13 @@
     </header>
 
     <div class="screen-content home-layout">
-      <!-- Fixed Section (Search, Quick Favorites, Albums) -->
+      <!-- Fixed Section (Search, 5 Featured Albums, Explore Albums) -->
       <div class="home-fixed-section">
         <div class="search-row">
           <input type="text" id="searchInput" placeholder="Search songs, albums, or artists..." aria-label="Search songs">
         </div>
 
-        <!-- Quick Favorites Banner on Home Screen -->
+        <!-- Quick Favorites Banner -->
         <div class="favorite-quick-banner" id="homeFavBanner" role="button" tabindex="0" aria-label="Open Favorites">
           <div class="fav-banner-thumb">
             <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
@@ -45,7 +45,7 @@
           <button class="play-circle-sm" id="homeFavPlayBtn" aria-label="Play Favorites">▶</button>
         </div>
 
-        <!-- Albums Tier 1: Main 3 Large Albums -->
+        <!-- Section 1: Featured Albums (Top 5 Uniform Cards) -->
         <div class="section-row">
           <h3>Featured Albums</h3>
         </div>
@@ -56,14 +56,16 @@
           </div>
         </div>
 
-        <!-- Albums Tier 2: Explore Albums -->
+        <!-- Section 2: Explore Albums (Uniform Clean Cards + See All) -->
         <div class="section-row section-header-split">
           <h3>Explore Albums</h3>
           <button class="see-all-btn" id="seeAllAlbumsBtn">See All →</button>
         </div>
-        <div class="explore-album-row" id="homeExploreAlbums"></div>
+        <div class="explore-album-row" id="homeExploreAlbums">
+          <!-- Dynamically populated with uniform cards -->
+        </div>
 
-        <!-- Recently Played Section -->
+        <!-- Section 3: Recently Played -->
         <div class="section-row recent-header-row">
           <h3>Recently Played</h3>
           <button id="clearRecentBtn" class="clear-recent-btn" title="Clear Recently Played Tracks" style="display: none;">Clear</button>
@@ -85,7 +87,7 @@
       </button>
       <div class="now-playing-label">
         <span>Now Playing</span>
-        <small id="nowPlayingSource">Album Playlist</small>
+        <small id="nowPlayingSource">Drive Playlist</small>
       </div>
       <div style="width: 42px;"></div>
     </header>
@@ -95,7 +97,6 @@
         <img id="playerArtwork" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
       </div>
 
-      <!-- Live Equalizer Visualizer Canvas -->
       <div class="visualizer-container">
         <canvas id="equalizerCanvas" width="320" height="38"></canvas>
       </div>
@@ -140,7 +141,7 @@
 
       <div class="volume-row">
         <button class="icon-btn vol-btn" id="muteBtn" aria-label="Mute Audio">
-          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>`;
         </button>
         <input type="range" id="volumeSlider" min="0" max="100" value="100" aria-label="Adjust Volume">
       </div>
@@ -169,14 +170,12 @@
       <!-- Panel: All Albums List -->
       <div class="tab-panel active" id="panel-playlists">
         <div id="libraryAlbumList">
-          <!-- Favorites Row -->
           <div class="playlist-row" data-album-id="FAV">
             <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/default-cover.png'">
             <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
             <button class="row-play-btn" data-play-album="FAV" title="Play All">▶</button>
           </div>
 
-          <!-- Device Files Row -->
           <div class="playlist-row" data-album-id="LOCAL">
             <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/default-cover.png';">
             <div><strong>Device Files (Local)</strong><small id="countLocal">0 Files</small></div>
@@ -185,7 +184,7 @@
         </div>
       </div>
 
-      <!-- Panel: Album Songs Drill-Down View -->
+      <!-- Panel: Album Drill-Down View -->
       <div class="tab-panel" id="panel-volume-detail">
         <div class="vol-detail-header">
           <button id="backToVolumesBtn" class="back-link">← Back to Albums</button>
