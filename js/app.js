@@ -1,5 +1,5 @@
 // =================================================================
-// Didode Music Player - Universal Engine & Complete Favorite Controls
+// Didode Music Player - 5 Featured Albums & Uniform Carousel Engine
 // =================================================================
 
 const state = {
@@ -228,32 +228,35 @@ async function fetchDriveAlbums() {
 }
 
 // -----------------------------------------------------
-// TWO-TIER ALBUM RENDERING
+// TWO-TIER ALBUM RENDERING: 5 IN FEATURED & UNIFORM EXPLORE
 // -----------------------------------------------------
 function renderTwoTierAlbums() {
   const mainCarousel = document.getElementById("homeMainAlbums");
-  const exploreGrid = document.getElementById("homeExploreAlbums");
+  const exploreRow = document.getElementById("homeExploreAlbums");
   const libraryAlbumList = document.getElementById("libraryAlbumList");
 
-  if (!mainCarousel || !exploreGrid || !libraryAlbumList) return;
+  if (!mainCarousel || !exploreRow || !libraryAlbumList) return;
 
+  // 1. Featured Section: Top 5 Albums (Device, Favorites + 3 Drive Albums)
   mainCarousel.innerHTML = "";
 
-  const mainThree = [
+  const mainFive = [
     { id: "LOCAL", name: "Device Files", coverUrl: "assets/cover-local.png", countText: `${state.localSongs.length} Files` },
     { id: "FAV", name: "Favorites", coverUrl: "assets/cover-fav.png", countText: `${getSongsByAlbumId("FAV").length} Songs` }
   ];
 
-  if (state.albums.length > 0) {
-    mainThree.push({
-      id: state.albums[0].id,
-      name: state.albums[0].name,
-      coverUrl: state.albums[0].coverUrl,
-      countText: `${state.albums[0].songs.length} Tracks`
+  // Pick up to 3 albums from Drive to make total 5 featured albums
+  const driveFeatured = state.albums.slice(0, 3);
+  driveFeatured.forEach(alb => {
+    mainFive.push({
+      id: alb.id,
+      name: alb.name,
+      coverUrl: alb.coverUrl,
+      countText: `${alb.songs.length} Tracks`
     });
-  }
+  });
 
-  mainThree.forEach(item => {
+  mainFive.forEach(item => {
     const card = document.createElement("div");
     card.className = "main-album-card";
     card.innerHTML = `
@@ -267,14 +270,15 @@ function renderTwoTierAlbums() {
     mainCarousel.appendChild(card);
   });
 
-  exploreGrid.innerHTML = "";
-  const remainingAlbums = state.albums.slice(1, 5);
+  // 2. Explore Albums: Remaining albums in a clean uniform scrollable row
+  exploreRow.innerHTML = "";
+  const remainingAlbums = state.albums.slice(3); // All albums after the first 3
 
   if (remainingAlbums.length === 0) {
-    exploreGrid.style.display = "none";
+    exploreRow.style.display = "none";
     document.querySelector(".section-header-split").style.display = "none";
   } else {
-    exploreGrid.style.display = "grid";
+    exploreRow.style.display = "flex";
     document.querySelector(".section-header-split").style.display = "flex";
 
     remainingAlbums.forEach(album => {
@@ -288,10 +292,11 @@ function renderTwoTierAlbums() {
         <small>${album.songs.length} Tracks</small>
       `;
       card.addEventListener("click", () => openAlbumDetail(album.id));
-      exploreGrid.appendChild(card);
+      exploreRow.appendChild(card);
     });
   }
 
+  // 3. Library View: All Albums List (Full Complete List)
   libraryAlbumList.querySelectorAll(".dynamic-album-row").forEach(el => el.remove());
 
   state.albums.forEach(album => {
@@ -323,7 +328,6 @@ function updateCounters() {
   const favCount = document.getElementById("countFav");
   const homeFavCount = document.getElementById("homeFavCount");
   const localCount = document.getElementById("countLocal");
-  const volCountLocal = document.getElementById("volCountLocal");
 
   const favSongs = getSongsByAlbumId("FAV");
   const favText = `${favSongs.length} Songs`;
@@ -331,7 +335,6 @@ function updateCounters() {
   if (favCount) favCount.textContent = favText;
   if (homeFavCount) homeFavCount.textContent = `${favSongs.length} Songs saved`;
   if (localCount) localCount.textContent = `${state.localSongs.length} Files`;
-  if (volCountLocal) volCountLocal.textContent = `${state.localSongs.length} Files`;
 }
 
 // -----------------------------------------------------
@@ -377,7 +380,6 @@ function openAlbumDetail(albumId) {
   if (titleEl) titleEl.textContent = meta.title;
   if (subEl) subEl.textContent = `${songs.length} Tracks available`;
 
-  // Display Clear All Favorites button only inside Favorites View
   if (clearFavsBtn) {
     clearFavsBtn.style.display = (albumId === "FAV" && songs.length > 0) ? "inline-block" : "none";
     clearFavsBtn.onclick = clearAllFavorites;
@@ -446,7 +448,6 @@ document.querySelectorAll(".playlist-row:not(.dynamic-album-row)").forEach(el =>
 // -----------------------------------------------------
 // FAVORITES REMOVAL & CLEAN LOGIC
 // -----------------------------------------------------
-// 1. Remove Single Favorite Song
 async function removeSingleFavorite(songId, event) {
   if (event) event.stopPropagation();
 
@@ -464,7 +465,6 @@ async function removeSingleFavorite(songId, event) {
   updateCounters();
   updateLikeIcon();
 
-  // Re-render Favorites Album View immediately if currently open
   const detailPanel = document.getElementById("panel-volume-detail");
   if (detailPanel?.classList.contains("active")) {
     const currentTitle = document.getElementById("volDetailTitle")?.textContent;
@@ -474,7 +474,6 @@ async function removeSingleFavorite(songId, event) {
   }
 }
 
-// 2. Clear All Favorite Songs
 async function clearAllFavorites() {
   if (!state.favorites.length) return;
 
@@ -495,7 +494,7 @@ async function clearAllFavorites() {
 }
 
 // -----------------------------------------------------
-// LOCAL AUDIO MANAGEMENT (Permanent Storage)
+// LOCAL AUDIO MANAGEMENT (IndexedDB Permanent Sync)
 // -----------------------------------------------------
 const localFileInput = document.getElementById("localFileInput");
 const clearAllBtn = document.getElementById("clearAllLocalBtn");
@@ -740,7 +739,6 @@ function buildSongRow(song, onPlay, isFavoriteView = false) {
   const row = document.createElement("div");
   row.className = "song-row";
   
-  // Conditionally render an unfavorite button if inside Favorites view
   const actionBtnHtml = isFavoriteView
     ? `<button class="delete-btn" title="Remove from Favorites" aria-label="Remove favorite">💔</button>`
     : `<button class="play-btn-item" aria-label="Play song">▶</button>`;
@@ -776,7 +774,7 @@ function saveToRecentlyPlayed(song) {
 }
 
 // -----------------------------------------------------
-// DIRECT DUAL PLAYBACK ENGINE
+// DIRECT DUAL PLAYBACK & REPEAT 1 ENGINE
 // -----------------------------------------------------
 function playSongAt(index) {
   if (!state.queue.length) return;
@@ -970,7 +968,7 @@ function updateMuteIcon(vol) {
   }
 }
 
-// Favorite Toggle on Player Screen
+// Favorite Toggle
 document.getElementById("likeBtn")?.addEventListener("click", () => {
   const song = state.queue[state.currentIndex];
   if (!song) return;
@@ -984,7 +982,6 @@ document.getElementById("likeBtn")?.addEventListener("click", () => {
   updateLikeIcon();
   updateCounters();
 
-  // If in Favorites album view, live update the list
   const detailPanel = document.getElementById("panel-volume-detail");
   if (detailPanel?.classList.contains("active")) {
     const currentTitle = document.getElementById("volDetailTitle")?.textContent;
