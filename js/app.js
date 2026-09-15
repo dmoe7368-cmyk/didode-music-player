@@ -1,29 +1,36 @@
-// =====================================================
-// Didode Music Player - Universal Engine & Custom Dialogs
-// =====================================================
+// =================================================================
+// Didode Music Player - Universal Engine & Complete Favorite Controls
+// =================================================================
 
 const state = {
-  driveSongs: [],
-  localSongs: [], // { id, name, blob, url, cover, isLocal: true }
+  albums: [],          // [{ id, name, coverUrl, songs: [] }]
+  allDriveSongs: [],   // Flattened list of Drive songs
+  localSongs: [],      // Stored local audio files
   queue: [],
   currentIndex: -1,
   isPlaying: false,
   isShuffle: false,
-  repeatMode: 0, // 0 = off, 1 = repeat all, 2 = repeat one
+  repeatMode: 0,       // 0 = Off, 1 = Repeat All, 2 = Repeat 1 (Single)
   favorites: JSON.parse(localStorage.getItem("favoriteSongs") || "[]"),
   volume: 1
 };
 
 const audioEl = document.getElementById("audioEl");
 
+function getDriveDirectImageUrl(fileId) {
+  if (!fileId) return "assets/default-cover.png";
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
+}
+
 // -----------------------------------------------------
-// CUSTOM IN-APP CONFIRMATION DIALOG (No Browser Alert)
+// CUSTOM IN-APP CONFIRMATION MODAL
 // -----------------------------------------------------
-function showCustomConfirm(title, message, confirmText = "Confirm") {
+function showCustomConfirm(title, message, confirmText = "Confirm", icon = "🗑️") {
   return new Promise((resolve) => {
     const modalBackdrop = document.getElementById("customModal");
     const modalTitle = document.getElementById("modalTitle");
     const modalDesc = document.getElementById("modalDesc");
+    const modalIcon = document.getElementById("modalIcon");
     const confirmBtn = document.getElementById("modalConfirmBtn");
     const cancelBtn = document.getElementById("modalCancelBtn");
 
@@ -34,6 +41,7 @@ function showCustomConfirm(title, message, confirmText = "Confirm") {
 
     if (modalTitle) modalTitle.textContent = title;
     if (modalDesc) modalDesc.textContent = message;
+    if (modalIcon) modalIcon.textContent = icon;
     if (confirmBtn) confirmBtn.textContent = confirmText;
 
     modalBackdrop.classList.add("active");
@@ -116,7 +124,6 @@ document.querySelectorAll(".nav-btn, .nav-back").forEach(btn => {
   btn.addEventListener("click", () => showScreen(btn.dataset.target));
 });
 
-// Tab navigation
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -127,68 +134,254 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   });
 });
 
-// -----------------------------------------------------
-// NUMBER & VOLUME COVER RESOLVER
-// -----------------------------------------------------
-function extractSongNumber(filename) {
-  const match = filename.match(/\d+/);
-  return match ? parseInt(match[0], 10) : null;
-}
+document.getElementById("seeAllAlbumsBtn")?.addEventListener("click", () => {
+  showScreen("screen-library");
+  document.querySelector('.tab-btn[data-tab="playlists"]')?.click();
+});
 
-function getGroupAndCover(num) {
-  if (!num || num <= 50) {
-    return { group: "A", cover: "assets/cover-a.png" };
-  } else if (num <= 100) {
-    return { group: "B", cover: "assets/cover-b.png" };
-  } else {
-    return { group: "C", cover: "assets/cover-c.png" };
+// Home Favorites Banner Handlers
+document.getElementById("homeFavBanner")?.addEventListener("click", () => {
+  openAlbumDetail("FAV");
+});
+
+document.getElementById("homeFavPlayBtn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  playAlbumDirectly("FAV");
+});
+
+// -----------------------------------------------------
+// GOOGLE DRIVE ALBUM DISCOVERY
+// -----------------------------------------------------
+async function fetchDriveAlbums() {
+  const statusEl = document.getElementById("driveStatus");
+  const config = window.DRIVE_CONFIG || {};
+  const { folderId, apiKey } = config;
+
+  if (!folderId || !apiKey) {
+    if (statusEl) statusEl.textContent = "Google Drive Config Missing.";
+    return;
+  }
+
+  try {
+    const folderQuery = encodeURIComponent(`'${folderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+    const foldersRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${folderQuery}&fields=files(id,name)&pageSize=100&key=${apiKey}`);
+    const foldersData = await foldersRes.json();
+
+    if (foldersData.error) throw new Error(foldersData.error.message);
+
+    let driveFolders = foldersData.files || [];
+    if (driveFolders.length === 0) {
+      driveFolders = [{ id: folderId, name: "Drive Tracks" }];
+    }
+
+    const albums = [];
+    let allSongsAccumulator = [];
+
+    for (const folder of driveFolders) {
+      const contentsQuery = encodeURIComponent(`'${folder.id}' in parents and (mimeType contains 'audio/' or mimeType contains 'image/') and trashed = false`);
+      const contentsRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${contentsQuery}&fields=files(id,name,mimeType)&pageSize=500&key=${apiKey}`);
+      const contentsData = await contentsRes.json();
+
+      const items = contentsData.files || [];
+      const audioFiles = items.filter(it => it.mimeType.startsWith("audio/"));
+      const imageFiles = items.filter(it => it.mimeType.startsWith("image/"));
+
+      const coverFile = imageFiles.find(img => /cover|folder|album|art/i.test(img.name)) || imageFiles[0];
+      const coverUrl = coverFile ? getDriveDirectImageUrl(coverFile.id) : "assets/default-cover.png";
+
+      const songs = audioFiles.map(af => ({
+        id: af.id,
+        name: af.name.replace(/\.[^/.]+$/, ""),
+        url: `https://www.googleapis.com/drive/v3/files/${af.id}?alt=media&key=${apiKey}`,
+        cover: coverUrl,
+        albumName: folder.name,
+        albumId: folder.id,
+        isLocal: false
+      })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+      albums.push({
+        id: folder.id,
+        name: folder.name,
+        coverUrl: coverUrl,
+        songs: songs
+      });
+
+      allSongsAccumulator = allSongsAccumulator.concat(songs);
+    }
+
+    state.albums = albums;
+    state.allDriveSongs = allSongsAccumulator;
+
+    renderTwoTierAlbums();
+    renderAllSongsList();
+
+    if (statusEl) {
+      statusEl.textContent = allSongsAccumulator.length 
+        ? `${allSongsAccumulator.length} tracks loaded across ${albums.length} albums.` 
+        : "No audio tracks found in this Drive folder.";
+    }
+
+  } catch (err) {
+    console.error("Failed to load albums from Drive:", err);
+    if (statusEl) statusEl.textContent = "Error connecting to Google Drive. Check permissions.";
   }
 }
 
 // -----------------------------------------------------
-// VOLUME DRILL-DOWN: OPEN SONGS LIST FOR A VOLUME
+// TWO-TIER ALBUM RENDERING
 // -----------------------------------------------------
-function getSongsForGroup(group) {
-  if (group === "FAV") {
-    const all = [...state.driveSongs, ...state.localSongs];
+function renderTwoTierAlbums() {
+  const mainCarousel = document.getElementById("homeMainAlbums");
+  const exploreGrid = document.getElementById("homeExploreAlbums");
+  const libraryAlbumList = document.getElementById("libraryAlbumList");
+
+  if (!mainCarousel || !exploreGrid || !libraryAlbumList) return;
+
+  mainCarousel.innerHTML = "";
+
+  const mainThree = [
+    { id: "LOCAL", name: "Device Files", coverUrl: "assets/cover-local.png", countText: `${state.localSongs.length} Files` },
+    { id: "FAV", name: "Favorites", coverUrl: "assets/cover-fav.png", countText: `${getSongsByAlbumId("FAV").length} Songs` }
+  ];
+
+  if (state.albums.length > 0) {
+    mainThree.push({
+      id: state.albums[0].id,
+      name: state.albums[0].name,
+      coverUrl: state.albums[0].coverUrl,
+      countText: `${state.albums[0].songs.length} Tracks`
+    });
+  }
+
+  mainThree.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "main-album-card";
+    card.innerHTML = `
+      <div class="main-album-thumb">
+        <img src="${item.coverUrl}" alt="${item.name} Cover" onerror="this.src='assets/default-cover.png'">
+      </div>
+      <strong>${item.name}</strong>
+      <small>${item.countText}</small>
+    `;
+    card.addEventListener("click", () => openAlbumDetail(item.id));
+    mainCarousel.appendChild(card);
+  });
+
+  exploreGrid.innerHTML = "";
+  const remainingAlbums = state.albums.slice(1, 5);
+
+  if (remainingAlbums.length === 0) {
+    exploreGrid.style.display = "none";
+    document.querySelector(".section-header-split").style.display = "none";
+  } else {
+    exploreGrid.style.display = "grid";
+    document.querySelector(".section-header-split").style.display = "flex";
+
+    remainingAlbums.forEach(album => {
+      const card = document.createElement("div");
+      card.className = "explore-album-card";
+      card.innerHTML = `
+        <div class="explore-thumb">
+          <img src="${album.coverUrl}" alt="${album.name} Cover" onerror="this.src='assets/default-cover.png'">
+        </div>
+        <strong>${album.name}</strong>
+        <small>${album.songs.length} Tracks</small>
+      `;
+      card.addEventListener("click", () => openAlbumDetail(album.id));
+      exploreGrid.appendChild(card);
+    });
+  }
+
+  libraryAlbumList.querySelectorAll(".dynamic-album-row").forEach(el => el.remove());
+
+  state.albums.forEach(album => {
+    const row = document.createElement("div");
+    row.className = "playlist-row dynamic-album-row";
+    row.dataset.albumId = album.id;
+    row.innerHTML = `
+      <img src="${album.coverUrl}" alt="${album.name} Cover" onerror="this.src='assets/default-cover.png'">
+      <div>
+        <strong>${album.name}</strong>
+        <small>${album.songs.length} Songs</small>
+      </div>
+      <button class="row-play-btn" data-play-album="${album.id}" title="Play All">▶</button>
+    `;
+
+    row.addEventListener("click", () => openAlbumDetail(album.id));
+    row.querySelector(".row-play-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      playAlbumDirectly(album.id);
+    });
+
+    libraryAlbumList.appendChild(row);
+  });
+
+  updateCounters();
+}
+
+function updateCounters() {
+  const favCount = document.getElementById("countFav");
+  const homeFavCount = document.getElementById("homeFavCount");
+  const localCount = document.getElementById("countLocal");
+  const volCountLocal = document.getElementById("volCountLocal");
+
+  const favSongs = getSongsByAlbumId("FAV");
+  const favText = `${favSongs.length} Songs`;
+
+  if (favCount) favCount.textContent = favText;
+  if (homeFavCount) homeFavCount.textContent = `${favSongs.length} Songs saved`;
+  if (localCount) localCount.textContent = `${state.localSongs.length} Files`;
+  if (volCountLocal) volCountLocal.textContent = `${state.localSongs.length} Files`;
+}
+
+// -----------------------------------------------------
+// ALBUM DETAIL DRILL-DOWN & FAVORITE MANAGEMENT
+// -----------------------------------------------------
+function getSongsByAlbumId(albumId) {
+  if (albumId === "FAV") {
+    const all = [...state.allDriveSongs, ...state.localSongs];
     return all.filter(s => state.favorites.includes(s.id));
-  } else if (group === "LOCAL") {
+  } else if (albumId === "LOCAL") {
     return state.localSongs;
   } else {
-    return state.driveSongs.filter(s => s.group === group);
+    const album = state.albums.find(a => a.id === albumId);
+    return album ? album.songs : [];
   }
 }
 
-function getVolumeMetadata(group) {
-  switch (group) {
-    case "FAV":
-      return { title: "Favorite Tracks", cover: "assets/cover-fav.png" };
-    case "A":
-      return { title: "Tracks 1 - 50", cover: "assets/cover-a.png" };
-    case "B":
-      return { title: "Tracks 51 - 100", cover: "assets/cover-b.png" };
-    case "C":
-      return { title: "Tracks 101 - 150", cover: "assets/cover-c.png" };
-    case "LOCAL":
-      return { title: "Device Files", cover: "assets/cover-local.png" };
-    default:
-      return { title: "Volume " + group, cover: "assets/cover-a.png" };
+function getAlbumMetadata(albumId) {
+  if (albumId === "FAV") {
+    return { title: "Favorites", cover: "assets/cover-fav.png" };
+  } else if (albumId === "LOCAL") {
+    return { title: "Device Files", cover: "assets/cover-local.png" };
+  } else {
+    const album = state.albums.find(a => a.id === albumId);
+    return album 
+      ? { title: album.name, cover: album.coverUrl } 
+      : { title: "Album", cover: "assets/default-cover.png" };
   }
 }
 
-function openVolumeDetail(group) {
-  const meta = getVolumeMetadata(group);
-  const songs = getSongsForGroup(group);
+function openAlbumDetail(albumId) {
+  const meta = getAlbumMetadata(albumId);
+  const songs = getSongsByAlbumId(albumId);
 
   const coverEl = document.getElementById("volDetailCover");
   const titleEl = document.getElementById("volDetailTitle");
   const subEl = document.getElementById("volDetailSubtitle");
   const playAllBtn = document.getElementById("volDetailPlayAllBtn");
+  const clearFavsBtn = document.getElementById("clearFavsInDetailBtn");
   const listContainer = document.getElementById("volDetailSongList");
 
   if (coverEl) coverEl.src = meta.cover;
   if (titleEl) titleEl.textContent = meta.title;
   if (subEl) subEl.textContent = `${songs.length} Tracks available`;
+
+  // Display Clear All Favorites button only inside Favorites View
+  if (clearFavsBtn) {
+    clearFavsBtn.style.display = (albumId === "FAV" && songs.length > 0) ? "inline-block" : "none";
+    clearFavsBtn.onclick = clearAllFavorites;
+  }
 
   if (playAllBtn) {
     playAllBtn.onclick = () => {
@@ -203,14 +396,14 @@ function openVolumeDetail(group) {
   if (listContainer) {
     listContainer.innerHTML = "";
     if (!songs.length) {
-      listContainer.innerHTML = `<p class="status-text">No songs in this volume yet.</p>`;
+      listContainer.innerHTML = `<p class="status-text">No tracks inside this album.</p>`;
     } else {
       songs.forEach((song, idx) => {
         listContainer.appendChild(buildSongRow(song, () => {
           state.queue = songs;
           playSongAt(idx);
           showScreen("screen-player");
-        }));
+        }, albumId === "FAV"));
       });
     }
   }
@@ -218,8 +411,7 @@ function openVolumeDetail(group) {
   showScreen("screen-library");
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  const detailPanel = document.getElementById("panel-volume-detail");
-  if (detailPanel) detailPanel.classList.add("active");
+  document.getElementById("panel-volume-detail")?.classList.add("active");
 }
 
 document.getElementById("backToVolumesBtn")?.addEventListener("click", () => {
@@ -228,34 +420,82 @@ document.getElementById("backToVolumesBtn")?.addEventListener("click", () => {
   document.querySelector('.tab-btn[data-tab="playlists"]')?.classList.add("active");
 });
 
-function playVolumeDirectly(group, event) {
-  if (event) event.stopPropagation();
-  const songs = getSongsForGroup(group);
+function playAlbumDirectly(albumId) {
+  const songs = getSongsByAlbumId(albumId);
   if (songs.length) {
     state.queue = songs;
     playSongAt(0);
     showScreen("screen-player");
-  } else if (group === "LOCAL") {
+  } else if (albumId === "LOCAL") {
     showScreen("screen-library");
     document.querySelector('.tab-btn[data-tab="local"]')?.click();
   }
 }
 
-document.querySelectorAll(".volume-card").forEach(el => {
-  el.addEventListener("click", () => openVolumeDetail(el.dataset.group));
-});
-
-document.querySelectorAll(".playlist-row").forEach(el => {
-  el.addEventListener("click", () => openVolumeDetail(el.dataset.group));
-
+document.querySelectorAll(".playlist-row:not(.dynamic-album-row)").forEach(el => {
+  el.addEventListener("click", () => openAlbumDetail(el.dataset.albumId));
   const playBtn = el.querySelector(".row-play-btn");
   if (playBtn) {
-    playBtn.addEventListener("click", (e) => playVolumeDirectly(el.dataset.group, e));
+    playBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      playAlbumDirectly(el.dataset.albumId);
+    });
   }
 });
 
 // -----------------------------------------------------
-// LOCAL AUDIO MANAGEMENT (IndexedDB Permanent Sync)
+// FAVORITES REMOVAL & CLEAN LOGIC
+// -----------------------------------------------------
+// 1. Remove Single Favorite Song
+async function removeSingleFavorite(songId, event) {
+  if (event) event.stopPropagation();
+
+  const confirmed = await showCustomConfirm(
+    "Remove Favorite",
+    "Remove this track from your favorites list?",
+    "Remove",
+    "💔"
+  );
+  if (!confirmed) return;
+
+  state.favorites = state.favorites.filter(id => id !== songId);
+  localStorage.setItem("favoriteSongs", JSON.stringify(state.favorites));
+
+  updateCounters();
+  updateLikeIcon();
+
+  // Re-render Favorites Album View immediately if currently open
+  const detailPanel = document.getElementById("panel-volume-detail");
+  if (detailPanel?.classList.contains("active")) {
+    const currentTitle = document.getElementById("volDetailTitle")?.textContent;
+    if (currentTitle === "Favorites") {
+      openAlbumDetail("FAV");
+    }
+  }
+}
+
+// 2. Clear All Favorite Songs
+async function clearAllFavorites() {
+  if (!state.favorites.length) return;
+
+  const confirmed = await showCustomConfirm(
+    "Clear All Favorites",
+    "Are you sure you want to clear all favorite tracks?",
+    "Clear All",
+    "💔"
+  );
+  if (!confirmed) return;
+
+  state.favorites = [];
+  localStorage.setItem("favoriteSongs", JSON.stringify(state.favorites));
+
+  updateCounters();
+  updateLikeIcon();
+  openAlbumDetail("FAV");
+}
+
+// -----------------------------------------------------
+// LOCAL AUDIO MANAGEMENT (Permanent Storage)
 // -----------------------------------------------------
 const localFileInput = document.getElementById("localFileInput");
 const clearAllBtn = document.getElementById("clearAllLocalBtn");
@@ -281,7 +521,7 @@ async function handleLocalFiles(files) {
       name: cleanName,
       blob: file,
       cover: "assets/cover-local.png",
-      group: "Local",
+      albumName: "Device Files",
       isLocal: true
     };
 
@@ -294,7 +534,7 @@ async function handleLocalFiles(files) {
   }
 
   renderLocalSongs();
-  updateLocalCount();
+  renderTwoTierAlbums();
 
   showScreen("screen-library");
   document.querySelector('.tab-btn[data-tab="local"]')?.click();
@@ -308,11 +548,11 @@ localFileInput?.addEventListener("change", (e) => {
 async function deleteLocalSong(songId, event) {
   if (event) event.stopPropagation();
 
-  // Custom In-App Modal instead of native browser confirm
   const confirmed = await showCustomConfirm(
     "Delete Track",
     "Remove this track from your local storage?",
-    "Delete"
+    "Delete",
+    "🗑️"
   );
   if (!confirmed) return;
 
@@ -335,7 +575,6 @@ async function deleteLocalSong(songId, event) {
   }
 
   await deleteTrackFromDB(songId);
-
   state.localSongs.splice(songIndex, 1);
 
   state.favorites = state.favorites.filter(id => id !== songId);
@@ -347,17 +586,17 @@ async function deleteLocalSong(songId, event) {
 
   renderLocalSongs();
   renderRecentlyPlayed();
-  updateLocalCount();
+  renderTwoTierAlbums();
 }
 
-// Replaced GitHub Popup with Custom In-App Modal
 async function clearAllLocalSongs() {
   if (!state.localSongs.length) return;
 
   const confirmed = await showCustomConfirm(
     "Clear All Local Tracks",
     "Permanently remove all saved local songs from this device?",
-    "Clear All"
+    "Clear All",
+    "🗑️"
   );
   if (!confirmed) return;
 
@@ -385,23 +624,10 @@ async function clearAllLocalSongs() {
 
   renderLocalSongs();
   renderRecentlyPlayed();
-  updateLocalCount();
+  renderTwoTierAlbums();
 }
 
 clearAllBtn?.addEventListener("click", clearAllLocalSongs);
-
-function updateLocalCount() {
-  const countHome = document.getElementById("volCountLocal");
-  const countLibrary = document.getElementById("countLocal");
-  const text = `${state.localSongs.length} Files`;
-
-  if (countHome) countHome.textContent = text;
-  if (countLibrary) countLibrary.textContent = text;
-
-  if (clearAllBtn) {
-    clearAllBtn.style.display = state.localSongs.length > 0 ? "inline-flex" : "none";
-  }
-}
 
 function renderLocalSongs() {
   const container = document.getElementById("localSongsList");
@@ -420,7 +646,7 @@ function renderLocalSongs() {
     const row = document.createElement("div");
     row.className = "song-row";
     row.innerHTML = `
-      <img src="${song.cover}" alt="cover" onerror="this.src='assets/cover-a.png'">
+      <img src="${song.cover}" alt="cover" onerror="this.src='assets/default-cover.png'">
       <div class="meta">
         <strong>${song.name}</strong>
         <small>Device File</small>
@@ -445,171 +671,98 @@ function renderLocalSongs() {
 }
 
 // -----------------------------------------------------
-// GOOGLE DRIVE API FETCH
+// UI RENDERING (ALL SONGS & RECENT WITH CLEAR FEATURE)
 // -----------------------------------------------------
-async function fetchDriveSongs() {
-  const statusEl = document.getElementById("driveStatus");
-  const heroTitle = document.getElementById("heroTitle");
-  const heroSub = document.getElementById("heroSub");
-  const config = window.DRIVE_CONFIG || {};
-  const { folderId, apiKey } = config;
-
-  if (!folderId || !apiKey) {
-    if (statusEl) statusEl.textContent = "Google Drive Config Missing (Check config.js).";
-    if (heroTitle) heroTitle.textContent = "Drive Config Missing";
-    if (heroSub) heroSub.textContent = "Set API Key in js/config.js";
-    return;
-  }
-
-  let pageToken = "";
-  let allFiles = [];
-
-  try {
-    do {
-      const url = `https://www.googleapis.com/drive/v3/files?q=` +
-        encodeURIComponent(`'${folderId}' in parents and mimeType contains 'audio/' and trashed=false`) +
-        `&fields=nextPageToken,files(id,name)` +
-        `&pageSize=1000` +
-        (pageToken ? `&pageToken=${pageToken}` : "") +
-        `&key=${apiKey}`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-
-      if (data.error) throw new Error(data.error.message);
-
-      allFiles = allFiles.concat(data.files || []);
-      pageToken = data.nextPageToken || "";
-    } while (pageToken);
-
-    state.driveSongs = allFiles
-      .map(f => {
-        const num = extractSongNumber(f.name);
-        const { group, cover } = getGroupAndCover(num);
-        return {
-          id: f.id,
-          number: num,
-          name: f.name.replace(/\.[^/.]+$/, ""),
-          url: `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&key=${apiKey}`,
-          cover: cover,
-          group: group,
-          isLocal: false
-        };
-      })
-      .sort((a, b) => (a.number || 0) - (b.number || 0));
-
-    renderAllSongs();
-    renderGroupCounts();
-    renderHero();
-    renderRecentlyPlayed();
-
-  } catch (err) {
-    console.error("Drive fetch error:", err);
-    if (statusEl) statusEl.textContent = "Could not load Drive files. Please check API Key and permissions.";
-    if (heroTitle) heroTitle.textContent = "Drive Load Failed";
-    if (heroSub) heroSub.textContent = "Check permissions or network";
-  }
-}
-
-// -----------------------------------------------------
-// UI RENDERING
-// -----------------------------------------------------
-function renderAllSongs() {
+function renderAllSongsList() {
   const container = document.getElementById("allSongsList");
   if (!container) return;
-  if (!state.driveSongs.length) {
-    container.innerHTML = `<p class="status-text">No tracks found in Google Drive folder.</p>`;
+
+  if (!state.allDriveSongs.length) {
+    container.innerHTML = `<p class="status-text">No tracks found in Google Drive.</p>`;
     return;
   }
   container.innerHTML = "";
-  state.driveSongs.forEach((song, idx) => {
+  state.allDriveSongs.forEach((song, idx) => {
     container.appendChild(buildSongRow(song, () => {
-      state.queue = state.driveSongs;
+      state.queue = state.allDriveSongs;
       playSongAt(idx);
       showScreen("screen-player");
     }));
   });
 }
 
-function renderGroupCounts() {
-  const counts = { A: 0, B: 0, C: 0 };
-  state.driveSongs.forEach(s => {
-    if (counts[s.group] !== undefined) counts[s.group]++;
-  });
+async function clearRecentlyPlayedHistory() {
+  const stored = JSON.parse(localStorage.getItem("recentlyPlayed") || "[]");
+  if (!stored.length) return;
 
-  const countA = document.getElementById("countA");
-  const countB = document.getElementById("countB");
-  const countC = document.getElementById("countC");
-  const volA = document.getElementById("volCountA");
-  const volB = document.getElementById("volCountB");
-  const volC = document.getElementById("volCountC");
+  const confirmed = await showCustomConfirm(
+    "Clear Recently Played",
+    "Clear your recently played history?",
+    "Clear",
+    "🕒"
+  );
+  if (!confirmed) return;
 
-  if (countA) countA.textContent = `${counts.A} Songs`;
-  if (countB) countB.textContent = `${counts.B} Songs`;
-  if (countC) countC.textContent = `${counts.C} Songs`;
-  if (volA) volA.textContent = `${counts.A} Songs`;
-  if (volB) volB.textContent = `${counts.B} Songs`;
-  if (volC) volC.textContent = `${counts.C} Songs`;
-
-  renderFavoritesCount();
+  localStorage.removeItem("recentlyPlayed");
+  renderRecentlyPlayed();
 }
 
-function renderFavoritesCount() {
-  const el = document.getElementById("countFav");
-  if (el) el.textContent = `${state.favorites.length} Songs`;
-}
-
-function renderHero() {
-  if (!state.driveSongs.length) return;
-  const pick = state.driveSongs[Math.floor(Math.random() * state.driveSongs.length)];
-  const titleEl = document.getElementById("heroTitle");
-  const subEl = document.getElementById("heroSub");
-  const coverEl = document.getElementById("heroArtwork");
-  const heroCard = document.getElementById("heroCard");
-
-  if (titleEl) titleEl.textContent = pick.name;
-  if (subEl) subEl.textContent = pick.isLocal ? "Device File" : `Volume ${pick.group}`;
-  if (coverEl) coverEl.src = pick.cover;
-
-  heroCard.onclick = () => {
-    state.queue = state.driveSongs;
-    const idx = state.driveSongs.findIndex(s => s.id === pick.id);
-    playSongAt(idx !== -1 ? idx : 0);
-    showScreen("screen-player");
-  };
-}
+document.getElementById("clearRecentBtn")?.addEventListener("click", clearRecentlyPlayedHistory);
 
 function renderRecentlyPlayed() {
   const container = document.getElementById("recentList");
+  const clearRecentBtn = document.getElementById("clearRecentBtn");
   if (!container) return;
+
   const stored = JSON.parse(localStorage.getItem("recentlyPlayed") || "[]");
+  
+  if (clearRecentBtn) {
+    clearRecentBtn.style.display = stored.length > 0 ? "inline-block" : "none";
+  }
+
   if (!stored.length) {
     container.innerHTML = `<p class="status-text">No tracks played yet.</p>`;
     return;
   }
+
   container.innerHTML = "";
   stored.slice(0, 15).forEach(song => {
     container.appendChild(buildSongRow(song, () => {
-      const fullList = [...state.driveSongs, ...state.localSongs];
-      state.queue = [song, ...fullList.filter(s => s.id !== song.id)];
+      const all = [...state.allDriveSongs, ...state.localSongs];
+      state.queue = [song, ...all.filter(s => s.id !== song.id)];
       playSongAt(0);
       showScreen("screen-player");
     }));
   });
 }
 
-function buildSongRow(song, onPlay) {
+function buildSongRow(song, onPlay, isFavoriteView = false) {
   const row = document.createElement("div");
   row.className = "song-row";
+  
+  // Conditionally render an unfavorite button if inside Favorites view
+  const actionBtnHtml = isFavoriteView
+    ? `<button class="delete-btn" title="Remove from Favorites" aria-label="Remove favorite">💔</button>`
+    : `<button class="play-btn-item" aria-label="Play song">▶</button>`;
+
   row.innerHTML = `
-    <img src="${song.cover}" alt="cover" loading="lazy" onerror="this.src='assets/cover-a.png'">
+    <img src="${song.cover}" alt="cover" loading="lazy" onerror="this.src='assets/default-cover.png'">
     <div class="meta">
       <strong>${song.name}</strong>
-      <small>${song.isLocal ? "Device File" : "Volume " + song.group}</small>
+      <small>${song.isLocal ? "Device File" : song.albumName || "Drive Track"}</small>
     </div>
-    <button aria-label="Play song">▶</button>
+    <div class="row-actions">
+      ${actionBtnHtml}
+    </div>
   `;
+
   row.addEventListener("click", onPlay);
+
+  if (isFavoriteView) {
+    const unfavBtn = row.querySelector(".delete-btn");
+    unfavBtn?.addEventListener("click", (e) => removeSingleFavorite(song.id, e));
+  }
+
   return row;
 }
 
@@ -623,7 +776,7 @@ function saveToRecentlyPlayed(song) {
 }
 
 // -----------------------------------------------------
-// UNIVERSAL AUDIO PLAYBACK (DRIVE + LOCAL)
+// DIRECT DUAL PLAYBACK ENGINE
 // -----------------------------------------------------
 function playSongAt(index) {
   if (!state.queue.length) return;
@@ -655,8 +808,8 @@ function playSongAt(index) {
   if (playerArtwork) playerArtwork.src = song.cover;
   
   document.getElementById("trackTitle").textContent = song.name;
-  document.getElementById("trackArtist").textContent = song.isLocal ? "Device File" : "Volume " + song.group;
-  document.getElementById("nowPlayingSource").textContent = song.isLocal ? "Local Storage" : "Drive Volume " + song.group;
+  document.getElementById("trackArtist").textContent = song.isLocal ? "Device File" : song.albumName || "Drive Track";
+  document.getElementById("nowPlayingSource").textContent = song.isLocal ? "Local Storage" : song.albumName || "Drive Album";
 
   updatePlayPauseIcon();
   updateLikeIcon();
@@ -695,14 +848,22 @@ function playPrev() {
   playSongAt(prevIndex);
 }
 
+// -----------------------------------------------------
+// AUDIO ENDED LOGIC (REPEAT 1 vs REPEAT ALL vs OFF)
+// -----------------------------------------------------
 audioEl.addEventListener("ended", () => {
   if (state.repeatMode === 2) {
-    playSongAt(state.currentIndex);
-  } else if (state.repeatMode === 1 || state.currentIndex < state.queue.length - 1) {
+    audioEl.currentTime = 0;
+    audioEl.play().catch(err => console.warn(err));
+  } else if (state.repeatMode === 1) {
     playNext();
   } else {
-    state.isPlaying = false;
-    updatePlayPauseIcon();
+    if (state.currentIndex < state.queue.length - 1) {
+      playNext();
+    } else {
+      state.isPlaying = false;
+      updatePlayPauseIcon();
+    }
   }
 });
 
@@ -736,9 +897,43 @@ document.getElementById("shuffleBtn")?.addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("active-toggle", state.isShuffle);
 });
 
-document.getElementById("repeatBtn")?.addEventListener("click", (e) => {
+// Repeat Tri-State Controller
+const repeatBtn = document.getElementById("repeatBtn");
+
+function updateRepeatUI() {
+  if (!repeatBtn) return;
+
+  if (state.repeatMode === 0) {
+    repeatBtn.classList.remove("active-toggle");
+    repeatBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+    `;
+    repeatBtn.setAttribute("title", "Repeat Off");
+  } else if (state.repeatMode === 1) {
+    repeatBtn.classList.add("active-toggle");
+    repeatBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+    `;
+    repeatBtn.setAttribute("title", "Repeat All");
+  } else if (state.repeatMode === 2) {
+    repeatBtn.classList.add("active-toggle");
+    repeatBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+      <span class="repeat-badge">1</span>
+    `;
+    repeatBtn.setAttribute("title", "Repeat 1 Track");
+  }
+}
+
+repeatBtn?.addEventListener("click", () => {
   state.repeatMode = (state.repeatMode + 1) % 3;
-  e.currentTarget.classList.toggle("active-toggle", state.repeatMode !== 0);
+  updateRepeatUI();
 });
 
 // Volume Controls
@@ -775,7 +970,7 @@ function updateMuteIcon(vol) {
   }
 }
 
-// Favorite Toggle
+// Favorite Toggle on Player Screen
 document.getElementById("likeBtn")?.addEventListener("click", () => {
   const song = state.queue[state.currentIndex];
   if (!song) return;
@@ -787,7 +982,16 @@ document.getElementById("likeBtn")?.addEventListener("click", () => {
   }
   localStorage.setItem("favoriteSongs", JSON.stringify(state.favorites));
   updateLikeIcon();
-  renderFavoritesCount();
+  updateCounters();
+
+  // If in Favorites album view, live update the list
+  const detailPanel = document.getElementById("panel-volume-detail");
+  if (detailPanel?.classList.contains("active")) {
+    const currentTitle = document.getElementById("volDetailTitle")?.textContent;
+    if (currentTitle === "Favorites") {
+      openAlbumDetail("FAV");
+    }
+  }
 });
 
 function updateLikeIcon() {
@@ -801,8 +1005,8 @@ function updateLikeIcon() {
 // Search
 document.getElementById("searchInput")?.addEventListener("input", (e) => {
   const q = e.target.value.toLowerCase().trim();
-  const allAvailable = [...state.driveSongs, ...state.localSongs];
-  const filtered = allAvailable.filter(s => s.name.toLowerCase().includes(q));
+  const allAvailable = [...state.allDriveSongs, ...state.localSongs];
+  const filtered = allAvailable.filter(s => s.name.toLowerCase().includes(q) || (s.albumName && s.albumName.toLowerCase().includes(q)));
   const container = document.getElementById("allSongsList");
   if (!container) return;
 
@@ -826,10 +1030,11 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 });
 
 // -----------------------------------------------------
-// APP INITIALIZATION & RE-HYDRATION
+// INITIALIZATION
 // -----------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
   renderVisualizer();
+  updateRepeatUI();
 
   try {
     await initDB();
@@ -840,15 +1045,13 @@ window.addEventListener("DOMContentLoaded", async () => {
         ...t,
         url: URL.createObjectURL(t.blob)
       }));
-
       renderLocalSongs();
-      updateLocalCount();
     }
   } catch (err) {
     console.error("IndexedDB initialization failed:", err);
   }
 
   if (window.DRIVE_CONFIG && window.DRIVE_CONFIG.autoLoad) {
-    fetchDriveSongs();
+    fetchDriveAlbums();
   }
 });
