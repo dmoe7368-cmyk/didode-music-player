@@ -26,62 +26,47 @@
     </header>
 
     <div class="screen-content home-layout">
-      <!-- Fixed Section (Header, Search, Hero, Carousel) -->
+      <!-- Fixed Section (Search, Quick Favorites, Albums) -->
       <div class="home-fixed-section">
         <div class="search-row">
-          <input type="text" id="searchInput" placeholder="Search songs or artists..." aria-label="Search songs">
+          <input type="text" id="searchInput" placeholder="Search songs, albums, or artists..." aria-label="Search songs">
         </div>
 
-        <div class="hero-card" id="heroCard" role="button" tabindex="0" aria-label="Play Featured Track">
-          <div class="hero-cover-wrap">
-            <img id="heroArtwork" src="assets/cover-a.png" alt="Featured Cover">
+        <!-- Quick Favorites Banner on Home Screen -->
+        <div class="favorite-quick-banner" id="homeFavBanner" role="button" tabindex="0" aria-label="Open Favorites">
+          <div class="fav-banner-thumb">
+            <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
+            <span class="fav-badge-icon">❤️</span>
           </div>
-          <div class="hero-text">
-            <h2 id="heroTitle">Connecting to Library...</h2>
-            <p id="heroSub">Fetching music tracks</p>
+          <div class="fav-banner-meta">
+            <strong>Favorite Songs</strong>
+            <small id="homeFavCount">0 Songs saved</small>
           </div>
-          <button class="play-circle" id="heroPlayBtn" aria-label="Play Track">▶</button>
+          <button class="play-circle-sm" id="homeFavPlayBtn" aria-label="Play Favorites">▶</button>
         </div>
 
+        <!-- Albums Tier 1: Main 3 Large Albums -->
         <div class="section-row">
-          <h3>Playlists & Volumes</h3>
+          <h3>Featured Albums</h3>
         </div>
-        <div class="volume-carousel">
-          <div class="volume-card" data-group="A" role="button" tabindex="0">
-            <div class="vol-thumb">
-              <img src="assets/cover-a.png" alt="Volume A Cover">
-            </div>
-            <strong>Tracks 1 - 50</strong>
-            <small id="volCountA">0 Songs</small>
-          </div>
-
-          <div class="volume-card" data-group="B" role="button" tabindex="0">
-            <div class="vol-thumb">
-              <img src="assets/cover-b.png" alt="Volume B Cover">
-            </div>
-            <strong>Tracks 51 - 100</strong>
-            <small id="volCountB">0 Songs</small>
-          </div>
-
-          <div class="volume-card" data-group="C" role="button" tabindex="0">
-            <div class="vol-thumb">
-              <img src="assets/cover-c.png" alt="Volume C Cover">
-            </div>
-            <strong>Tracks 101 - 150</strong>
-            <small id="volCountC">0 Songs</small>
-          </div>
-
-          <div class="volume-card" data-group="LOCAL" role="button" tabindex="0">
-            <div class="vol-thumb local-thumb">
-              <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/cover-a.png';">
-            </div>
-            <strong>Device Files</strong>
-            <small id="volCountLocal">0 Files</small>
+        <div class="main-album-carousel" id="homeMainAlbums">
+          <div class="main-album-card skeleton-card">
+            <div class="main-album-thumb skeleton"></div>
+            <strong>Connecting...</strong>
           </div>
         </div>
 
-        <div class="section-row">
+        <!-- Albums Tier 2: Explore Albums -->
+        <div class="section-row section-header-split">
+          <h3>Explore Albums</h3>
+          <button class="see-all-btn" id="seeAllAlbumsBtn">See All →</button>
+        </div>
+        <div class="explore-album-row" id="homeExploreAlbums"></div>
+
+        <!-- Recently Played Section -->
+        <div class="section-row recent-header-row">
           <h3>Recently Played</h3>
+          <button id="clearRecentBtn" class="clear-recent-btn" title="Clear Recently Played Tracks" style="display: none;">Clear</button>
         </div>
       </div>
 
@@ -100,17 +85,17 @@
       </button>
       <div class="now-playing-label">
         <span>Now Playing</span>
-        <small id="nowPlayingSource">Playlist</small>
+        <small id="nowPlayingSource">Album Playlist</small>
       </div>
       <div style="width: 42px;"></div>
     </header>
 
     <div class="screen-content player-content">
       <div class="artwork-wrap">
-        <img id="playerArtwork" src="assets/cover-a.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
+        <img id="playerArtwork" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
       </div>
 
-      <!-- Equalizer Visualizer Canvas -->
+      <!-- Live Equalizer Visualizer Canvas -->
       <div class="visualizer-container">
         <canvas id="equalizerCanvas" width="320" height="38"></canvas>
       </div>
@@ -155,7 +140,7 @@
 
       <div class="volume-row">
         <button class="icon-btn vol-btn" id="muteBtn" aria-label="Mute Audio">
-          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>`;
+          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
         </button>
         <input type="range" id="volumeSlider" min="0" max="100" value="100" aria-label="Adjust Volume">
       </div>
@@ -175,66 +160,54 @@
     </header>
 
     <div class="screen-content">
-      <!-- Tabs Navigation -->
       <div class="tab-row" id="libraryTabsRow">
-        <button class="tab-btn active" data-tab="playlists">Volumes</button>
+        <button class="tab-btn active" data-tab="playlists">All Albums</button>
         <button class="tab-btn" data-tab="songs">All Songs</button>
         <button class="tab-btn" data-tab="local">Local Files</button>
       </div>
 
-      <!-- Panel: Volumes List -->
+      <!-- Panel: All Albums List -->
       <div class="tab-panel active" id="panel-playlists">
-        <div class="playlist-row" data-group="FAV">
-          <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
-          <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
-          <button class="row-play-btn" data-play-group="FAV" title="Play All">▶</button>
-        </div>
+        <div id="libraryAlbumList">
+          <!-- Favorites Row -->
+          <div class="playlist-row" data-album-id="FAV">
+            <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/default-cover.png'">
+            <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
+            <button class="row-play-btn" data-play-album="FAV" title="Play All">▶</button>
+          </div>
 
-        <div class="playlist-row" data-group="A">
-          <img src="assets/cover-a.png" alt="Volume A Cover">
-          <div><strong>Tracks 1 - 50</strong><small id="countA">0 Songs</small></div>
-          <button class="row-play-btn" data-play-group="A" title="Play All">▶</button>
-        </div>
-
-        <div class="playlist-row" data-group="B">
-          <img src="assets/cover-b.png" alt="Volume B Cover">
-          <div><strong>Tracks 51 - 100</strong><small id="countB">0 Songs</small></div>
-          <button class="row-play-btn" data-play-group="B" title="Play All">▶</button>
-        </div>
-
-        <div class="playlist-row" data-group="C">
-          <img src="assets/cover-c.png" alt="Volume C Cover">
-          <div><strong>Tracks 101 - 150</strong><small id="countC">0 Songs</small></div>
-          <button class="row-play-btn" data-play-group="C" title="Play All">▶</button>
-        </div>
-
-        <div class="playlist-row" data-group="LOCAL">
-          <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/cover-a.png';">
-          <div><strong>Device Files (Local)</strong><small id="countLocal">0 Files</small></div>
-          <button class="row-play-btn" data-play-group="LOCAL" title="Play All">▶</button>
+          <!-- Device Files Row -->
+          <div class="playlist-row" data-album-id="LOCAL">
+            <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/default-cover.png';">
+            <div><strong>Device Files (Local)</strong><small id="countLocal">0 Files</small></div>
+            <button class="row-play-btn" data-play-album="LOCAL" title="Play All">▶</button>
+          </div>
         </div>
       </div>
 
-      <!-- Panel: Volume Drill-Down View -->
+      <!-- Panel: Album Songs Drill-Down View -->
       <div class="tab-panel" id="panel-volume-detail">
         <div class="vol-detail-header">
-          <button id="backToVolumesBtn" class="back-link">← Back to Volumes</button>
+          <button id="backToVolumesBtn" class="back-link">← Back to Albums</button>
           <div class="vol-detail-banner">
-            <img id="volDetailCover" src="assets/cover-a.png" alt="Volume Cover">
+            <img id="volDetailCover" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
             <div class="vol-detail-info">
-              <h3 id="volDetailTitle">Tracks 1 - 50</h3>
+              <h3 id="volDetailTitle">Album Name</h3>
               <p id="volDetailSubtitle">0 Tracks</p>
-              <button id="volDetailPlayAllBtn" class="detail-play-all">▶ Play All</button>
+              <div class="detail-actions">
+                <button id="volDetailPlayAllBtn" class="detail-play-all">▶ Play All</button>
+                <button id="clearFavsInDetailBtn" class="detail-del-album" style="display: none;">🗑 Clear All Favorites</button>
+              </div>
             </div>
           </div>
         </div>
         <div class="song-list" id="volDetailSongList"></div>
       </div>
 
-      <!-- Panel: All Songs (Drive) -->
+      <!-- Panel: All Songs -->
       <div class="tab-panel" id="panel-songs">
         <div class="song-list" id="allSongsList">
-          <p class="status-text" id="driveStatus">Loading tracks from Google Drive...</p>
+          <p class="status-text" id="driveStatus">Connecting to Google Drive folder...</p>
         </div>
       </div>
 
@@ -269,12 +242,12 @@
   <!-- ============ CUSTOM IN-APP CONFIRMATION MODAL ============ -->
   <div class="custom-modal-backdrop" id="customModal">
     <div class="custom-modal-box">
-      <div class="modal-icon">🗑️</div>
-      <h3 id="modalTitle">Clear All Local Tracks</h3>
-      <p id="modalDesc">Permanently remove all saved local songs from this device?</p>
+      <div class="modal-icon" id="modalIcon">🗑️</div>
+      <h3 id="modalTitle">Confirm Action</h3>
+      <p id="modalDesc">Are you sure you want to proceed?</p>
       <div class="modal-actions">
         <button id="modalCancelBtn" class="modal-btn cancel-btn">Cancel</button>
-        <button id="modalConfirmBtn" class="modal-btn confirm-btn">Clear All</button>
+        <button id="modalConfirmBtn" class="modal-btn confirm-btn">Confirm</button>
       </div>
     </div>
   </div>
