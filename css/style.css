@@ -1,16 +1,17 @@
 :root {
-  --bg-dark: #0e1408;
-  --bg-gradient: radial-gradient(circle at top, #273719 0%, #11180b 85%);
-  --card-bg: rgba(255, 255, 255, 0.05);
-  --card-border: rgba(182, 243, 56, 0.16);
+  /* Ultra-Deep Obsidian Forest Theme (Premium Aesthetic) */
+  --bg-dark: #070b04;
+  --bg-gradient: radial-gradient(circle at top, #16240d 0%, #090e04 80%, #050802 100%);
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --card-border: rgba(182, 243, 56, 0.14);
   --text-main: #f5f8ed;
-  --text-muted: rgba(245, 248, 237, 0.62);
+  --text-muted: rgba(245, 248, 237, 0.58);
   --accent-lime: #b6f338;
-  --accent-lime-glow: rgba(182, 243, 56, 0.45);
+  --accent-lime-glow: rgba(182, 243, 56, 0.42);
   --danger: #ef4444;
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 20px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
 }
 
 * {
@@ -65,6 +66,7 @@ html, body {
   min-height: 0;
 }
 
+/* Home Layout */
 .home-layout {
   display: flex;
   flex-direction: column;
@@ -90,11 +92,12 @@ html, body {
   border-radius: 4px;
 }
 
+/* Header */
 .top-bar-clean {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 16px 12px;
+  padding: 16px 16px 10px;
   flex-shrink: 0;
 }
 .brand-title h1 {
@@ -106,7 +109,7 @@ html, body {
   font-size: 11px;
   background: rgba(182, 243, 56, 0.12);
   color: var(--accent-lime);
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -134,8 +137,8 @@ html, body {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-main);
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -149,10 +152,11 @@ html, body {
 }
 .upload-label {
   cursor: pointer;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
 }
 
+/* Search Bar */
 .search-row {
   margin-bottom: 12px;
 }
@@ -161,19 +165,19 @@ html, body {
   padding: 12px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--card-border);
-  background: var(--card-bg);
+  background: rgba(255, 255, 255, 0.03);
   color: #fff;
   font-size: 14px;
   outline: none;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
 }
 .search-row input:focus {
   border-color: var(--accent-lime);
 }
 
-/* Favorites Quick Banner on Home Screen */
+/* Favorites Quick Banner */
 .favorite-quick-banner {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   padding: 10px 14px;
@@ -182,7 +186,7 @@ html, body {
   gap: 14px;
   margin-bottom: 14px;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
   transition: transform 0.15s ease;
 }
 .favorite-quick-banner:active {
@@ -190,11 +194,11 @@ html, body {
 }
 .fav-banner-thumb {
   position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   overflow: hidden;
-  background: #192211;
+  background: #141c0c;
   flex-shrink: 0;
 }
 .fav-banner-thumb img {
@@ -206,8 +210,8 @@ html, body {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  font-size: 11px;
-  background: rgba(0, 0, 0, 0.6);
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.65);
   border-radius: 50%;
   padding: 2px;
 }
@@ -243,7 +247,7 @@ html, body {
   flex-shrink: 0;
 }
 
-/* Tier 1: Main 3 Large Albums */
+/* Section Headings */
 .section-row {
   margin-bottom: 8px;
 }
@@ -267,19 +271,24 @@ html, body {
   padding: 2px 4px;
 }
 
+/* ===================================================
+   SECTION 1: FEATURED ALBUMS (5 UNIFORM LARGE CARDS)
+   =================================================== */
 .main-album-carousel {
   display: flex;
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 4px;
   margin-bottom: 14px;
+  scroll-snap-type: x mandatory;
 }
 .main-album-carousel::-webkit-scrollbar {
   display: none;
 }
 .main-album-card {
-  flex: 0 0 142px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  flex: 0 0 138px;
+  width: 138px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 100%);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   padding: 10px;
@@ -288,21 +297,22 @@ html, body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  scroll-snap-align: start;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .main-album-card:active {
   transform: scale(0.96);
 }
 .main-album-thumb {
-  width: 122px;
-  height: 122px;
+  width: 118px;
+  height: 118px;
   border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: 8px;
-  background: #192211;
+  background: #12190b;
   position: relative;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 .main-album-thumb img {
   width: 100%;
@@ -310,49 +320,63 @@ html, body {
   object-fit: cover;
 }
 .main-album-card strong {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  display: block;
 }
 .main-album-card small {
   font-size: 11px;
   color: var(--accent-lime);
   font-weight: 600;
+  display: block;
 }
 
-/* Tier 2: Explore 4 Compact Albums */
+/* ===================================================
+   SECTION 2: EXPLORE ALBUMS (UNIFORM HORIZONTAL ROW)
+   Fixes: No uneven cards, perfectly aligned!
+   =================================================== */
 .explore-album-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
   margin-bottom: 14px;
+  scroll-snap-type: x mandatory;
+}
+.explore-album-row::-webkit-scrollbar {
+  display: none;
 }
 .explore-album-card {
+  flex: 0 0 96px;
+  width: 96px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-sm);
-  padding: 6px;
+  border-radius: var(--radius-md);
+  padding: 7px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  scroll-snap-align: start;
   transition: transform 0.15s ease;
 }
 .explore-album-card:active {
   transform: scale(0.95);
 }
 .explore-thumb {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  width: 80px;
+  height: 80px;
   border-radius: 8px;
   overflow: hidden;
-  background: #192211;
-  margin-bottom: 4px;
+  background: #141c0c;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 }
 .explore-thumb img {
   width: 100%;
@@ -361,18 +385,23 @@ html, body {
 }
 .explore-album-card strong {
   font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  display: block;
+  margin-bottom: 2px;
 }
 .explore-album-card small {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-muted);
+  display: block;
 }
 
+/* Skeleton Loading */
 .skeleton {
-  background: linear-gradient(90deg, #182310 25%, #233116 50%, #182310 75%);
+  background: linear-gradient(90deg, #12190b 25%, #1d2711 50%, #12190b 75%);
   background-size: 200% 100%;
   animation: skeletonLoad 1.5s infinite;
 }
@@ -421,7 +450,7 @@ html, body {
 .song-row img {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: 8px;
   object-fit: cover;
 }
 .song-row .meta {
@@ -430,14 +459,14 @@ html, body {
 }
 .song-row .meta strong {
   display: block;
-  font-size: 14px;
+  font-size: 13.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .song-row .meta small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .row-actions {
   display: flex;
@@ -452,7 +481,6 @@ html, body {
   cursor: pointer;
 }
 
-/* Action Icon Buttons on Song Rows */
 .delete-btn {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
@@ -610,11 +638,11 @@ html, body {
   background: rgba(255, 255, 255, 0.08);
 }
 .playlist-row img {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   object-fit: cover;
-  background: #192211;
+  background: #141c0c;
 }
 .playlist-row div {
   flex: 1;
@@ -741,8 +769,8 @@ html, body {
 
 .repeat-badge {
   position: absolute;
-  top: 13px;
-  right: 14px;
+  top: 12px;
+  right: 13px;
   font-size: 9px;
   font-weight: 900;
   line-height: 1;
@@ -824,7 +852,7 @@ html, body {
 
 .bottom-nav {
   width: 100%;
-  background: rgba(16, 22, 10, 0.96);
+  background: rgba(9, 14, 6, 0.96);
   border-top: 1px solid var(--card-border);
   display: flex;
   justify-content: space-around;
@@ -856,8 +884,8 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -875,12 +903,12 @@ html, body {
 .custom-modal-box {
   width: 100%;
   max-width: 340px;
-  background: #1c2613;
+  background: #151d0d;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   padding: 24px 20px;
   text-align: center;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.85);
 }
 .modal-icon {
   font-size: 38px;
