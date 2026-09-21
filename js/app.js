@@ -414,18 +414,36 @@ async function fetchDriveAlbums() {
 }
 
 // -----------------------------------------------------
-// PHYSICAL STORAGE SYNC & DOWNLOAD/CANCEL
+// PHYSICAL & OFFLINE STORAGE SYNC (FIXED FOR OFFLINE MODE)
 // -----------------------------------------------------
 async function syncPhysicalDownloadsState() {
   const storedRegistry = JSON.parse(localStorage.getItem("downloadRegistry") || "{}");
   const updatedRegistry = {};
 
+  // Preserve stored registry entries in offline mode without aggressive external checks
   for (const songId in storedRegistry) {
     const item = storedRegistry[songId];
-    const exists = await isFilePhysicallyPresent(item.fileName);
-    if (exists) {
+    if (item) {
       updatedRegistry[songId] = item;
     }
+  }
+
+  // Pull safely from IndexedDB downloaded store as fail-safe fallback
+  try {
+    const dbTracks = await getDownloadedTracksFromDB();
+    if (dbTracks && dbTracks.length > 0) {
+      dbTracks.forEach(track => {
+        if (!updatedRegistry[track.id]) {
+          updatedRegistry[track.id] = {
+            fileName: track.fileName,
+            filePath: `App Storage -> ${track.fileName}`,
+            blobUrl: track.blob ? URL.createObjectURL(track.blob) : undefined
+          };
+        }
+      });
+    }
+  } catch (e) {
+    console.warn("IndexedDB sync warning:", e);
   }
 
   state.downloadedFilesRegistry = updatedRegistry;
@@ -468,7 +486,18 @@ async function handleDownloadRequest(song, btnEl) {
     const { fileName, filePath } = await downloadAudioToPhoneStorage(song, controller.signal);
 
     state.activeDownloads.delete(song.id);
-    state.downloadedFilesRegistry[song.id] = { fileName, filePath };
+    
+    // Refresh blobUrl if stored via IndexedDB fallback
+    let blobUrl = undefined;
+    try {
+      const dbTracks = await getDownloadedTracksFromDB();
+      const match = dbTracks.find(t => t.id === song.id);
+      if (match && match.blob) {
+        blobUrl = URL.createObjectURL(match.blob);
+      }
+    } catch(err) {}
+
+    state.downloadedFilesRegistry[song.id] = { fileName, filePath, blobUrl };
     localStorage.setItem("downloadRegistry", JSON.stringify(state.downloadedFilesRegistry));
 
     showStorageToast("Download Complete", filePath, "📥");
@@ -602,7 +631,16 @@ async function downloadEntireAlbum(songs, albumTitle) {
         const downloadResult = await downloadAudioToPhoneStorage(song, controller.signal);
         state.activeDownloads.delete(song.id);
 
-        state.downloadedFilesRegistry[song.id] = { fileName: downloadResult.fileName, filePath: downloadResult.filePath };
+        let blobUrl = undefined;
+        try {
+          const dbTracks = await getDownloadedTracksFromDB();
+          const match = dbTracks.find(t => t.id === song.id);
+          if (match && match.blob) {
+            blobUrl = URL.createObjectURL(match.blob);
+          }
+        } catch(e) {}
+
+        state.downloadedFilesRegistry[song.id] = { fileName: downloadResult.fileName, filePath: downloadResult.filePath, blobUrl };
         downloadedCount++;
 
         if (rowDlBtn) {
@@ -745,6 +783,7 @@ function getSongsByAlbumId(albumId) {
   } else if (albumId === "LOCAL") {
     return state.localSongs;
   } else if (albumId === "DOWNLOADED") {
+    // Collect all drive/local songs that are registered in downloadedFilesRegistry
     const all = [...state.allDriveSongs, ...state.localSongs];
     return all.filter(s => !!state.downloadedFilesRegistry[s.id]);
   } else {
@@ -1047,7 +1086,7 @@ async function playSongAt(index) {
   audioEl.pause();
   audioEl.currentTime = 0;
 
-  // Check if downloaded offline in phone storage or web storage first
+  // Check if downloaded offline in local web storage or native storage
   let playSourceUrl = song.url;
   const isDownloaded = !!state.downloadedFilesRegistry[song.id];
 
@@ -1402,7 +1441,7 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 
   listContainer.innerHTML = "";
   if (!filtered.length) {
-    listContainer.innerHTML = `<p class="status-indicator">No songs found matching("${q}").</p>`;
+    listContainer.innerHTML = `<p class="status-indicator">No songs found matching "${q}".</p>`;
     return;
   }
 
@@ -1436,18 +1475,18 @@ window.addEventListener("DOMContentLoaded", async () => {
       }));
     }
 
-    // 2. Load Downloaded Offline Tracks from IndexedDB (Crucial for Web View Offline mode)
+    // 2. Load Downloaded Offline Tracks from IndexedDB as well for Web View Offline persistence
     const savedDownloadedTracks = await getDownloadedTracksFromDB();
     if (savedDownloadedTracks && savedDownloadedTracks.length > 0) {
-      const registry = {};
-      savedDownloadedTracks.forEach(item => {
-        registry[item.id] = {
-          fileName: item.fileName,
-          filePath: `App Storage -> ${item.fileName}`,
-          blobUrl: URL.createObjectURL(item.blob) // Stable local blob URL for offline web playback
-        };
+      savedDownloadedTracks.forEach(track => {
+        if (track.blob && !state.downloadedFilesRegistry[track.id]) {
+          state.downloadedFilesRegistry[track.id] = {
+            fileName: track.fileName,
+            filePath: `App Storage -> ${track.fileName}`,
+            blobUrl: URL.createObjectURL(track.blob)
+          };
+        }
       });
-      state.downloadedFilesRegistry = registry;
     }
 
   } catch (err) {
