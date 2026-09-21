@@ -873,7 +873,7 @@ function openAlbumDetail(albumId) {
 }
 
 // -----------------------------------------------------
-// LOCAL UPLOAD & FOLDER PICKER INTEGRATION
+// LOCAL UPLOAD DELETIONS
 // -----------------------------------------------------
 async function removeLocalUploadedFile(trackId, event) {
   if (event) event.stopPropagation();
@@ -961,12 +961,23 @@ async function clearAllFavorites() {
 }
 
 // -----------------------------------------------------
-// RECENTLY PLAYED MANAGEMENT
+// RECENTLY PLAYED MANAGEMENT (RESOLVER FIX)
 // -----------------------------------------------------
 function saveToRecentlyPlayed(song) {
   let stored = JSON.parse(localStorage.getItem("recentlyPlayed") || "[]");
   stored = stored.filter(s => s.id !== song.id);
-  stored.unshift(song);
+  
+  // Clean store without stale session Blob URL
+  const cleanSongSnapshot = {
+    id: song.id,
+    name: song.name,
+    cover: song.cover,
+    albumName: song.albumName,
+    albumId: song.albumId,
+    isLocal: song.isLocal
+  };
+
+  stored.unshift(cleanSongSnapshot);
   stored = stored.slice(0, 15);
   localStorage.setItem("recentlyPlayed", JSON.stringify(stored));
   renderRecentlyPlayed();
@@ -992,20 +1003,38 @@ function renderRecentlyPlayed() {
   }
 
   container.innerHTML = "";
-  stored.forEach((song) => {
+  stored.forEach((recentItem) => {
     const card = document.createElement("div");
     card.className = "square-card";
     card.innerHTML = `
       <div class="square-thumb">
-        <img src="${song.cover}" alt="cover" onerror="this.src='assets/default-cover.png'">
+        <img src="${recentItem.cover}" alt="cover" onerror="this.src='assets/default-cover.png'">
       </div>
-      <strong>${song.name}</strong>
-      <small>${song.isLocal ? "Local" : (song.albumName || "Drive")}</small>
+      <strong>${recentItem.name}</strong>
+      <small>${recentItem.isLocal ? "Local" : (recentItem.albumName || "Drive")}</small>
     `;
     card.addEventListener("click", () => {
-      const all = [...state.allDriveSongs, ...state.localSongs];
-      state.queue = [song, ...all.filter(s => s.id !== song.id)];
-      playSongAt(0);
+      // CRITICAL FIX: Resolve fresh active local song or fallback to drive catalog
+      let resolvedSong = null;
+      if (recentItem.isLocal) {
+        resolvedSong = state.localSongs.find(s => s.id === recentItem.id || s.name === recentItem.name);
+      } else {
+        resolvedSong = state.allDriveSongs.find(s => s.id === recentItem.id);
+      }
+
+      if (!resolvedSong) {
+        // Fallback search across everything
+        const allAvailable = [...state.localSongs, ...state.allDriveSongs];
+        resolvedSong = allAvailable.find(s => s.id === recentItem.id || s.name === recentItem.name);
+      }
+
+      if (resolvedSong) {
+        const all = [...state.localSongs, ...state.allDriveSongs];
+        state.queue = [resolvedSong, ...all.filter(s => s.id !== resolvedSong.id)];
+        playSongAt(0);
+      } else {
+        showCustomConfirm("File Not Found", `"${recentItem.name}" is no longer available in device storage.`, "OK", "⚠️");
+      }
     });
     container.appendChild(card);
   });
@@ -1025,7 +1054,7 @@ document.getElementById("clearRecentBtn")?.addEventListener("click", async () =>
 });
 
 // -----------------------------------------------------
-// LOCAL AUDIO UPLOAD (Handles DidodeMusic folder selections)
+// LOCAL AUDIO UPLOAD
 // -----------------------------------------------------
 const localFileInput = document.getElementById("localFileInput");
 
@@ -1063,7 +1092,7 @@ async function handleLocalFiles(files) {
   }
 
   renderFeaturedAlbumsDeck();
-  showStorageToast("Imported Successfully", `${validFiles.length} file(s) added to Device Files`, "📁");
+  showStorageToast("Import Successful", `${validFiles.length} file(s) added to Device Files`, "📁");
   openAlbumDetail("LOCAL");
 }
 
@@ -1083,10 +1112,17 @@ async function playSongAt(index) {
   audioEl.pause();
   audioEl.currentTime = 0;
 
+  // Resolve Play Source URL
   let playSourceUrl = song.url;
   const isDownloaded = !!state.downloadedFilesRegistry[song.id];
 
-  if (isDownloaded) {
+  if (song.isLocal) {
+    // Ensure fresh blob URL for local songs
+    const liveLocal = state.localSongs.find(s => s.id === song.id || s.name === song.name);
+    if (liveLocal && liveLocal.url) {
+      playSourceUrl = liveLocal.url;
+    }
+  } else if (isDownloaded) {
     if (state.downloadedFilesRegistry[song.id].blobUrl) {
       playSourceUrl = state.downloadedFilesRegistry[song.id].blobUrl;
     } else if (hasNativeFilesystem()) {
@@ -1098,18 +1134,21 @@ async function playSongAt(index) {
         });
         playSourceUrl = Capacitor.convertFileSrc(fileUri.uri);
       } catch (e) {
-        console.warn("Could not load local offline file, falling back to stream:", e);
+        console.warn("Local offline file failed:", e);
       }
     }
   }
 
-  const candidateUrls = [
-    playSourceUrl,
-    song.fallbackUrl,
-    song.secondaryFallbackUrl,
-    `https://docs.google.com/uc?export=download&id=${song.id}`,
-    `https://drive.google.com/uc?export=download&id=${song.id}`
-  ].filter(Boolean);
+  // If local file, do not fall back to Google Drive
+  const candidateUrls = song.isLocal
+    ? [playSourceUrl].filter(Boolean)
+    : [
+        playSourceUrl,
+        song.fallbackUrl,
+        song.secondaryFallbackUrl,
+        `https://docs.google.com/uc?export=download&id=${song.id}`,
+        `https://drive.google.com/uc?export=download&id=${song.id}`
+      ].filter(Boolean);
 
   let currentAttemptIdx = 0;
 
@@ -1118,8 +1157,10 @@ async function playSongAt(index) {
       state.isPlaying = false;
       updatePlayIcons();
       showCustomConfirm(
-        "Google Drive Playback Blocked",
-        `Google Drive has temporarily blocked direct streaming for "${song.name}" due to rate limits. Please download the track for offline listening or choose another one.`,
+        song.isLocal ? "Local Playback Error" : "Google Drive Playback Blocked",
+        song.isLocal 
+          ? `Could not play "${song.name}". Please re-upload or select the file from Device Files.` 
+          : `Google Drive has temporarily blocked direct streaming for "${song.name}" due to rate limits.`,
         "Got It",
         "⚠️",
         true
@@ -1140,7 +1181,7 @@ async function playSongAt(index) {
           updatePlayIcons();
         })
         .catch(err => {
-          console.warn(`Stream candidate ${currentAttemptIdx + 1} failed, trying failover...`, err);
+          console.warn(`Playback candidate ${currentAttemptIdx + 1} failed:`, err);
           currentAttemptIdx++;
           attemptPlayStream();
         });
@@ -1457,7 +1498,16 @@ window.addEventListener("DOMContentLoaded", async () => {
   try {
     await initDB();
     
-    // 1. Load Downloaded Offline Tracks FIRST so registry is ready before UI renders
+    // 1. Load Local Uploads / Device Files from IndexedDB FIRST to build valid Blob URLs
+    const savedLocalTracks = await getAllLocalTracksFromDB();
+    if (savedLocalTracks && savedLocalTracks.length > 0) {
+      state.localSongs = savedLocalTracks.map(t => ({
+        ...t,
+        url: URL.createObjectURL(t.blob)
+      }));
+    }
+
+    // 2. Load Downloaded Offline Tracks from IndexedDB
     const savedDownloadedTracks = await getDownloadedTracksFromDB();
     if (savedDownloadedTracks && savedDownloadedTracks.length > 0) {
       const registry = JSON.parse(localStorage.getItem("downloadRegistry") || "{}");
@@ -1472,15 +1522,6 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
       state.downloadedFilesRegistry = registry;
       localStorage.setItem("downloadRegistry", JSON.stringify(registry));
-    }
-
-    // 2. Load Local Uploads / Device Files from IndexedDB
-    const savedLocalTracks = await getAllLocalTracksFromDB();
-    if (savedLocalTracks && savedLocalTracks.length > 0) {
-      state.localSongs = savedLocalTracks.map(t => ({
-        ...t,
-        url: URL.createObjectURL(t.blob)
-      }));
     }
 
   } catch (err) {
