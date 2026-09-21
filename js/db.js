@@ -1,9 +1,9 @@
 // ==========================================================================
-// IndexedDB Engine - Distinct Local Uploads vs Downloaded Caches
+// DIDODE - IndexedDB Storage Engine for Offline Downloads
 // ==========================================================================
 
 const DB_NAME = "DidodeAudioDB";
-const DB_VERSION = 2; // Incremented version to create separate stores
+const DB_VERSION = 2;
 const LOCAL_STORE = "local_tracks";
 const DOWNLOADED_STORE = "downloaded_tracks";
 
@@ -11,8 +11,10 @@ let db = null;
 
 function initDB() {
   return new Promise((resolve, reject) => {
+    if (db) return resolve(db);
+
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
+
     request.onupgradeneeded = (e) => {
       const database = e.target.result;
       if (!database.objectStoreNames.contains(LOCAL_STORE)) {
@@ -22,77 +24,45 @@ function initDB() {
         database.createObjectStore(DOWNLOADED_STORE, { keyPath: "id" });
       }
     };
-    
+
     request.onsuccess = (e) => {
       db = e.target.result;
       resolve(db);
     };
-    
-    request.onerror = (e) => reject(e);
+
+    request.onerror = (e) => {
+      console.error("IndexedDB open error:", e.target.error);
+      reject(e.target.error);
+    };
   });
 }
 
-// ---------------- LOCAL UPLOADS ----------------
-function saveLocalTrackToDB(trackObj) {
+async function saveDownloadedTrackToDB(trackObj) {
+  const database = await initDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(LOCAL_STORE, "readwrite");
-    tx.objectStore(LOCAL_STORE).put(trackObj);
-    tx.oncomplete = () => resolve(trackObj);
-    tx.onerror = (e) => reject(e);
-  });
-}
-
-function getAllLocalTracksFromDB() {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(LOCAL_STORE, "readonly");
-    const req = tx.objectStore(LOCAL_STORE).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = (e) => reject(e);
-  });
-}
-
-function deleteLocalTrackFromDB(id) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(LOCAL_STORE, "readwrite");
-    tx.objectStore(LOCAL_STORE).delete(id);
-    tx.oncomplete = () => resolve(id);
-    tx.onerror = (e) => reject(e);
-  });
-}
-
-function clearAllLocalTracksFromDB() {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(LOCAL_STORE, "readwrite");
-    tx.objectStore(LOCAL_STORE).clear();
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = (e) => reject(e);
-  });
-}
-
-// ---------------- DOWNLOADED OFF-LINE TRACKS ----------------
-function saveDownloadedTrackToDB(trackObj) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DOWNLOADED_STORE, "readwrite");
+    const tx = database.transaction(DOWNLOADED_STORE, "readwrite");
     tx.objectStore(DOWNLOADED_STORE).put(trackObj);
     tx.oncomplete = () => resolve(trackObj);
-    tx.onerror = (e) => reject(e);
+    tx.onerror = (e) => reject(e.target.error);
   });
 }
 
-function getDownloadedTracksFromDB() {
+async function getDownloadedTracksFromDB() {
+  const database = await initDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(DOWNLOADED_STORE, "readonly");
+    const tx = database.transaction(DOWNLOADED_STORE, "readonly");
     const req = tx.objectStore(DOWNLOADED_STORE).getAll();
     req.onsuccess = () => resolve(req.result || []);
-    req.onerror = (e) => reject(e);
+    req.onerror = (e) => reject(e.target.error);
   });
 }
 
-function deleteDownloadedTrackFromDB(id) {
+async function deleteDownloadedTrackFromDB(id) {
+  const database = await initDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(DOWNLOADED_STORE, "readwrite");
+    const tx = database.transaction(DOWNLOADED_STORE, "readwrite");
     tx.objectStore(DOWNLOADED_STORE).delete(id);
     tx.oncomplete = () => resolve(id);
-    tx.onerror = (e) => reject(e);
+    tx.onerror = (e) => reject(e.target.error);
   });
 }
