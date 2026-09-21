@@ -1,82 +1,72 @@
-// =====================================================
-// Didode Music Player - sw.js (Service Worker)
-// =====================================================
+// ==========================================================================
+// DIDODE - Offline Service Worker (PWA Caching Engine)
+// ==========================================================================
 
-const CACHE_NAME = "didode-cache-v1";
-
-// App-shell files to pre-cache (NOT audio files, which stream from Drive)
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./css/style.css",
-  "./js/app.js",
-  "./js/config.js",
-  "./manifest.json",
-  "./assets/cover-a.png",
-  "./assets/cover-b.png",
-  "./assets/cover-c.png",
-  "./assets/cover-fav.svg",
-  "./assets/icons/icon-192.png",
-  "./assets/icons/icon-512.png"
+const CACHE_NAME = 'didode-music-v1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './css/style.css',
+  './js/app.js',
+  './js/db.js',
+  './js/storage.js',
+  './js/config.js',
+  './manifest.json',
+  './assets/default-cover.png',
+  './assets/cover-a.png',
+  './assets/cover-fav.png',
+  './assets/cover-local.png'
 ];
 
-// Install: pre-cache the app shell
-self.addEventListener("install", (event) => {
+// Install Event: Cache essential app shell files
+self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(APP_SHELL).catch((err) => {
-        // Don't fail install if one optional asset (e.g. a cover not yet uploaded) is missing
-        console.warn("Some app-shell assets failed to cache:", err);
-      });
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
   self.skipWaiting();
 });
 
-// Activate: clean up old cache versions
-self.addEventListener("activate", (event) => {
+// Activate Event: Clean up old caches
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      );
+    })
   );
   self.clients.claim();
 });
 
-// Fetch strategy:
-// - Google Drive API calls (song list + audio streams) -> always network (never cache, they're dynamic/large)
-// - Everything else (app shell) -> cache-first, falling back to network
-self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
-
-  const isDriveRequest =
-    url.includes("googleapis.com/drive") || url.includes("drive.google.com");
-
-  if (isDriveRequest) {
-    event.respondWith(fetch(event.request));
+// Fetch Event: Serve from cache when offline, fetch from network when online
+self.addEventListener('fetch', (event) => {
+  // Skip cross-origin requests like Google Drive API streams
+  if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request)
-          .then((response) => {
-            // Cache a copy of newly fetched app-shell files for next time
-            if (event.request.method === "GET" && response.status === 200) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-            }
-            return response;
-          })
-          .catch(() => cached)
-      );
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).then((response) => {
+        return caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, response.clone());
+          return response;
+        });
+      }).catch(() => {
+        // Fallback to index.html if offline and asset not cached
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
     })
-
   );
 });
