@@ -1,20 +1,22 @@
 // ==========================================================================
-// DIDODE - Physical Storage Download & Resilient Fallback Service
+// DIDODE - Storage & Share Service for Android/Web
 // ==========================================================================
-
-const STORAGE_FOLDER = "DidodeMusic";
 
 function hasNativeFilesystem() {
   return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Filesystem");
 }
 
-// 1. Check physical existence
+function hasSharePlugin() {
+  return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Share");
+}
+
+// 1. Check if file exists in App Storage / IndexedDB
 async function isFilePhysicallyPresent(fileName) {
   if (hasNativeFilesystem()) {
     try {
       const { Filesystem, Directory } = Capacitor.Plugins;
       await Filesystem.stat({
-        path: `${STORAGE_FOLDER}/${fileName}`,
+        path: `DidodeMusic/${fileName}`,
         directory: Directory.Documents
       });
       return true;
@@ -31,74 +33,57 @@ async function isFilePhysicallyPresent(fileName) {
   }
 }
 
-// 2. Multi-Endpoint Robust Downloader with AbortSignal
+// 2. Download and Optionally Trigger Android Share Sheet
 async function downloadAudioToPhoneStorage(song, signal, onProgress) {
   const fileName = `${song.name.replace(/[^a-zA-Z0-9_\-\u1000-\u109F]/g, "_")}.mp3`;
-  
-  if (onProgress) onProgress("Connecting to stream...");
-  
-  // Candidates endpoints to beat Google Drive quota locks
-  const streamUrls = [
-    song.url,
-    song.fallbackUrl,
-    `https://drive.google.com/uc?export=download&id=${song.id}`,
-    `https://docs.google.com/uc?export=download&id=${song.id}`
-  ].filter(Boolean);
-  
-  let response = null;
-  let fetchError = null;
-  
-  for (const url of streamUrls) {
-    try {
-      if (signal && signal.aborted) throw new DOMException("Aborted", "AbortError");
-      
-      response = await fetch(url, { signal, method: "GET" });
-      if (response.ok) {
-        const contentType = response.headers.get("content-type") || "";
-        // If Google returns HTML (Quota warning / virus check page), reject and try next
-        if (!contentType.includes("text/html")) {
-          break;
-        }
-      }
-    } catch (err) {
-      fetchError = err;
-      if (signal && signal.aborted) throw err;
-    }
-  }
-  
-  if (!response || !response.ok) {
-    throw fetchError || new Error("Google Drive Daily Download Quota Exceeded for this file. Please wait or try another track.");
-  }
-  
+
+  if (onProgress) onProgress("Downloading audio stream...");
+
+  const response = await fetch(song.url, { signal });
+  if (!response.ok) throw new Error("Failed to fetch audio stream");
   const blob = await response.blob();
-  
+
   if (signal && signal.aborted) {
     throw new DOMException("Aborted", "AbortError");
   }
-  
+
   let savedLocationPath = "";
-  
+
   if (hasNativeFilesystem()) {
     const { Filesystem, Directory } = Capacitor.Plugins;
     const base64Data = await blobToBase64(blob);
-    
+
     try {
       await Filesystem.mkdir({
-        path: STORAGE_FOLDER,
+        path: "DidodeMusic",
         directory: Directory.Documents,
         recursive: true
       });
     } catch (ignore) {}
-    
+
     const result = await Filesystem.writeFile({
-      path: `${STORAGE_FOLDER}/${fileName}`,
+      path: `DidodeMusic/${fileName}`,
       data: base64Data,
       directory: Directory.Documents
     });
-    
-    savedLocationPath = result.uri || `/storage/emulated/0/Documents/${STORAGE_FOLDER}/${fileName}`;
+
+    savedLocationPath = result.uri;
+
+    // Automatically trigger Android Share/Save Dialog so user can place it in Download/Music folder
+    if (hasSharePlugin() && Capacitor.getPlatform() === 'android') {
+      try {
+        await Capacitor.Plugins.Share.share({
+          title: song.name,
+          text: 'Save your downloaded music file:',
+          url: result.uri,
+          dialogTitle: 'Save Music File'
+        });
+      } catch (shareErr) {
+        console.warn("Share sheet dismissed or unavailable:", shareErr);
+      }
+    }
   } else {
-    // Web Storage Fallback
+    // Web / PWA Fallback
     await saveDownloadedTrackToDB({
       id: song.id,
       fileName: fileName,
@@ -109,19 +94,19 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
       albumId: song.albumId,
       isDownloaded: true
     });
-    savedLocationPath = `App Storage -> ${fileName}`;
+    savedLocationPath = `App Storage (IndexedDB) -> ${fileName}`;
   }
-  
+
   return { fileName, filePath: savedLocationPath };
 }
 
-// 3. Delete Physical File from Phone Storage
+// 3. Delete Physical File
 async function deleteAudioFromPhoneStorage(fileName, songId) {
   if (hasNativeFilesystem()) {
     try {
       const { Filesystem, Directory } = Capacitor.Plugins;
       await Filesystem.deleteFile({
-        path: `${STORAGE_FOLDER}/${fileName}`,
+        path: `DidodeMusic/${fileName}`,
         directory: Directory.Documents
       });
     } catch (err) {
