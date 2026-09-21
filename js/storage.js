@@ -1,13 +1,26 @@
 // ==========================================================================
-// DIDODE - Storage Manager with Identifiable App Prefix
+// DIDODE - Cross-Platform (iOS & Android) Storage Engine
 // ==========================================================================
 
 const APP_PREFIX = "DidodeMusic_";
+
+// Detect Platform
+function getClientPlatform() {
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+  if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+    return "ios";
+  }
+  if (/android/i.test(userAgent)) {
+    return "android";
+  }
+  return "web";
+}
 
 function hasNativeFilesystem() {
   return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Filesystem");
 }
 
+// 1. Check physical existence
 async function isFilePhysicallyPresent(fileName) {
   if (hasNativeFilesystem()) {
     try {
@@ -30,9 +43,11 @@ async function isFilePhysicallyPresent(fileName) {
   }
 }
 
+// 2. Cross-Platform Download Handler
 async function downloadAudioToPhoneStorage(song, signal, onProgress) {
   const cleanSongName = song.name.replace(/[^a-zA-Z0-9_\-\u1000-\u109F]/g, "_");
   const fileName = `${APP_PREFIX}${cleanSongName}.mp3`;
+  const platform = getClientPlatform();
 
   if (onProgress) onProgress("Downloading audio stream...");
 
@@ -47,6 +62,7 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
   let savedLocationPath = "";
 
   if (hasNativeFilesystem()) {
+    // Native Capacitor (Android / iOS native app)
     const { Filesystem, Directory } = Capacitor.Plugins;
     const base64Data = await blobToBase64(blob);
 
@@ -64,9 +80,9 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
       directory: Directory.Documents
     });
 
-    savedLocationPath = result.uri || `/storage/emulated/0/Documents/DidodeMusic/${fileName}`;
+    savedLocationPath = result.uri;
   } else {
-    // Web / Vercel: Browser Download Manager
+    // Web / Vercel Website View Environment
     const blobUrl = URL.createObjectURL(blob);
     const downloadAnchor = document.createElement("a");
     downloadAnchor.href = blobUrl;
@@ -77,7 +93,7 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
 
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
-    // Save internally in IndexedDB for Offline Web Playback
+    // Save internally in IndexedDB for Offline Playback
     await saveDownloadedTrackToDB({
       id: song.id,
       fileName: fileName,
@@ -89,12 +105,18 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
       isDownloaded: true
     });
 
-    savedLocationPath = `Download/${fileName}`;
+    // Display platform-accurate notification text
+    if (platform === "ios") {
+      savedLocationPath = `Files App -> Downloads/${fileName}`;
+    } else {
+      savedLocationPath = `Internal Storage -> Download/${fileName}`;
+    }
   }
 
   return { fileName, filePath: savedLocationPath };
 }
 
+// 3. Delete Physical File
 async function deleteAudioFromPhoneStorage(fileName, songId) {
   if (hasNativeFilesystem()) {
     try {
