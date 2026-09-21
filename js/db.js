@@ -1,68 +1,49 @@
-// ==========================================================================
-// DIDODE - IndexedDB Storage Engine for Offline Downloads
-// ==========================================================================
+// -----------------------------------------------------
+// APP BOOTSTRAP & OFFLINE STATE SYNCHRONIZATION
+// -----------------------------------------------------
+window.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await initDB();
+    
+    // 1. Load Downloaded Offline Tracks FIRST so registry is ready before UI renders
+    const savedDownloadedTracks = await getDownloadedTracksFromDB();
+    if (savedDownloadedTracks && savedDownloadedTracks.length > 0) {
+      const registry = JSON.parse(localStorage.getItem("downloadRegistry") || "{}");
+      savedDownloadedTracks.forEach(track => {
+        if (track.blob) {
+          registry[track.id] = {
+            fileName: track.fileName,
+            filePath: `App Storage -> ${track.fileName}`,
+            blobUrl: URL.createObjectURL(track.blob)
+          };
+        }
+      });
+      state.downloadedFilesRegistry = registry;
+      localStorage.setItem("downloadRegistry", JSON.stringify(registry));
+    }
 
-const DB_NAME = "DidodeAudioDB";
-const DB_VERSION = 2;
-const LOCAL_STORE = "local_tracks";
-const DOWNLOADED_STORE = "downloaded_tracks";
+    // 2. Load Local Uploads from IndexedDB
+    const savedLocalTracks = await getAllLocalTracksFromDB();
+    if (savedLocalTracks && savedLocalTracks.length > 0) {
+      state.localSongs = savedLocalTracks.map(t => ({
+        ...t,
+        url: URL.createObjectURL(t.blob)
+      }));
+    }
 
-let db = null;
+  } catch (err) {
+    console.error("IndexedDB initialization error:", err);
+  }
 
-function initDB() {
-  return new Promise((resolve, reject) => {
-    if (db) return resolve(db);
+  renderVisualizer();
+  updateRepeatUI();
+  renderRecentlyPlayed();
+  setupHeroPlayerExpansion();
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  await syncPhysicalDownloadsState();
+  renderFeaturedAlbumsDeck();
 
-    request.onupgradeneeded = (e) => {
-      const database = e.target.result;
-      if (!database.objectStoreNames.contains(LOCAL_STORE)) {
-        database.createObjectStore(LOCAL_STORE, { keyPath: "id" });
-      }
-      if (!database.objectStoreNames.contains(DOWNLOADED_STORE)) {
-        database.createObjectStore(DOWNLOADED_STORE, { keyPath: "id" });
-      }
-    };
-
-    request.onsuccess = (e) => {
-      db = e.target.result;
-      resolve(db);
-    };
-
-    request.onerror = (e) => {
-      console.error("IndexedDB open error:", e.target.error);
-      reject(e.target.error);
-    };
-  });
-}
-
-async function saveDownloadedTrackToDB(trackObj) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(DOWNLOADED_STORE, "readwrite");
-    tx.objectStore(DOWNLOADED_STORE).put(trackObj);
-    tx.oncomplete = () => resolve(trackObj);
-    tx.onerror = (e) => reject(e.target.error);
-  });
-}
-
-async function getDownloadedTracksFromDB() {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(DOWNLOADED_STORE, "readonly");
-    const req = tx.objectStore(DOWNLOADED_STORE).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
-async function deleteDownloadedTrackFromDB(id) {
-  const database = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(DOWNLOADED_STORE, "readwrite");
-    tx.objectStore(DOWNLOADED_STORE).delete(id);
-    tx.oncomplete = () => resolve(id);
-    tx.onerror = (e) => reject(e.target.error);
-  });
-}
+  if (window.DRIVE_CONFIG && window.DRIVE_CONFIG.autoLoad) {
+    fetchDriveAlbums();
+  }
+});
