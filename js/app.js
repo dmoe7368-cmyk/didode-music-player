@@ -1,5 +1,5 @@
 // ==========================================================================
-// DIDODE - High Performance Audio Engine & UI Controller
+// DIDODE - High Performance Audio Engine & Offline State Manager
 // ==========================================================================
 
 const state = {
@@ -1047,20 +1047,24 @@ async function playSongAt(index) {
   audioEl.pause();
   audioEl.currentTime = 0;
 
-  // Check if downloaded offline in phone storage first
+  // Check if downloaded offline in phone storage or web storage first
   let playSourceUrl = song.url;
   const isDownloaded = !!state.downloadedFilesRegistry[song.id];
 
-  if (isDownloaded && hasNativeFilesystem()) {
-    try {
-      const { Filesystem, Directory } = Capacitor.Plugins;
-      const fileUri = await Filesystem.getUri({
-        path: `DidodeMusic/${state.downloadedFilesRegistry[song.id].fileName}`,
-        directory: Directory.Documents
-      });
-      playSourceUrl = Capacitor.convertFileSrc(fileUri.uri);
-    } catch (e) {
-      console.warn("Could not load local offline file, falling back to stream:", e);
+  if (isDownloaded) {
+    if (state.downloadedFilesRegistry[song.id].blobUrl) {
+      playSourceUrl = state.downloadedFilesRegistry[song.id].blobUrl;
+    } else if (hasNativeFilesystem()) {
+      try {
+        const { Filesystem, Directory } = Capacitor.Plugins;
+        const fileUri = await Filesystem.getUri({
+          path: `DidodeMusic/${state.downloadedFilesRegistry[song.id].fileName}`,
+          directory: Directory.Documents
+        });
+        playSourceUrl = Capacitor.convertFileSrc(fileUri.uri);
+      } catch (e) {
+        console.warn("Could not load local offline file, falling back to stream:", e);
+      }
     }
   }
 
@@ -1398,7 +1402,7 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 
   listContainer.innerHTML = "";
   if (!filtered.length) {
-    listContainer.innerHTML = `<p class="status-indicator">No songs found matching "${q}".</p>`;
+    listContainer.innerHTML = `<p class="status-indicator">No songs found matching("${q}").</p>`;
     return;
   }
 
@@ -1412,7 +1416,7 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 });
 
 // -----------------------------------------------------
-// APP BOOTSTRAP
+// APP BOOTSTRAP & OFFLINE STATE SYNCHRONIZATION
 // -----------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
   renderVisualizer();
@@ -1422,15 +1426,32 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   try {
     await initDB();
-    const savedTracks = await getAllLocalTracksFromDB();
-    if (savedTracks && savedTracks.length > 0) {
-      state.localSongs = savedTracks.map(t => ({
+    
+    // 1. Load Local Uploads from IndexedDB
+    const savedLocalTracks = await getAllLocalTracksFromDB();
+    if (savedLocalTracks && savedLocalTracks.length > 0) {
+      state.localSongs = savedLocalTracks.map(t => ({
         ...t,
         url: URL.createObjectURL(t.blob)
       }));
     }
+
+    // 2. Load Downloaded Offline Tracks from IndexedDB (Crucial for Web View Offline mode)
+    const savedDownloadedTracks = await getDownloadedTracksFromDB();
+    if (savedDownloadedTracks && savedDownloadedTracks.length > 0) {
+      const registry = {};
+      savedDownloadedTracks.forEach(item => {
+        registry[item.id] = {
+          fileName: item.fileName,
+          filePath: `App Storage -> ${item.fileName}`,
+          blobUrl: URL.createObjectURL(item.blob) // Stable local blob URL for offline web playback
+        };
+      });
+      state.downloadedFilesRegistry = registry;
+    }
+
   } catch (err) {
-    console.error("IndexedDB error:", err);
+    console.error("IndexedDB initialization error:", err);
   }
 
   await syncPhysicalDownloadsState();
