@@ -1,8 +1,8 @@
 // ==========================================================================
-// DIDODE - Offline Service Worker (PWA Caching Engine)
+// DIDODE - Resilient Offline PWA Service Worker
 // ==========================================================================
 
-const CACHE_NAME = 'didode-music-v1';
+const CACHE_NAME = 'didode-music-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -18,7 +18,7 @@ const ASSETS_TO_CACHE = [
   './assets/cover-local.png'
 ];
 
-// Install Event: Cache essential app shell files
+// 1. Install & Cache Core Assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -28,7 +28,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate Event: Clean up old caches
+// 2. Activate & Clear Old Caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -44,9 +44,9 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch Event: Serve from cache when offline, fetch from network when online
+// 3. Fetch Handler with Immediate Offline Fallback
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests like Google Drive API streams
+  // Skip cross-origin requests (like Google Drive API streams)
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
@@ -56,17 +56,23 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).then((response) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, response.clone());
-          return response;
+      return fetch(event.request)
+        .then((response) => {
+          return caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+        .catch(() => {
+          // If offline and request is navigation/HTML, return cached index.html immediately
+          if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+            return caches.match('./index.html');
+          }
+          return new Response('Network error happened', {
+            status: 404,
+            statusText: 'Offline'
+          });
         });
-      }).catch(() => {
-        // Fallback to index.html if offline and asset not cached
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
     })
   );
 });
