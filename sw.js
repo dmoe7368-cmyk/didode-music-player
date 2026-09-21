@@ -1,24 +1,24 @@
 // ==========================================================================
-// DIDODE - Resilient Offline PWA Service Worker
+// DIDODE - Vercel PWA Offline Service Worker
 // ==========================================================================
 
-const CACHE_NAME = 'didode-music-v2';
+const CACHE_NAME = 'didode-vercel-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './manifest.json',
   './css/style.css',
   './js/app.js',
   './js/db.js',
   './js/storage.js',
   './js/config.js',
-  './manifest.json',
   './assets/default-cover.png',
   './assets/cover-a.png',
   './assets/cover-fav.png',
   './assets/cover-local.png'
 ];
 
-// 1. Install & Cache Core Assets
+// Install Event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -28,7 +28,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 2. Activate & Clear Old Caches
+// Activate Event
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -44,9 +44,8 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 3. Fetch Handler with Immediate Offline Fallback
+// Fetch Event with Offline Fallback
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests (like Google Drive API streams)
   if (!event.request.url.startsWith(self.location.origin)) {
     return;
   }
@@ -64,14 +63,9 @@ self.addEventListener('fetch', (event) => {
           });
         })
         .catch(() => {
-          // If offline and request is navigation/HTML, return cached index.html immediately
           if (event.request.mode === 'navigate' || event.request.destination === 'document') {
             return caches.match('./index.html');
           }
-          return new Response('Network error happened', {
-            status: 404,
-            statusText: 'Offline'
-          });
         });
     })
   );
