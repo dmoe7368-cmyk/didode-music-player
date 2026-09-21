@@ -3,250 +3,313 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Didode Music Player</title>
+  <title>DIDODE</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#090d05">
+  <meta name="theme-color" content="#070b04">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <div class="app-shell">
 
-  <!-- ============ 1. HOME SCREEN ============ -->
+  <!-- Storage Location Toast Notification -->
+  <aside class="storage-toast" id="storageToast" role="alert" aria-live="polite">
+    <div class="toast-icon" id="toastIcon">📁</div>
+    <div class="toast-text">
+      <strong id="toastTitle">Action Successful!</strong>
+      <small id="toastPath">Location: /storage/emulated/0/Documents/DidodeMusic/</small>
+    </div>
+  </aside>
+
+  <!-- ================= SCREEN 1: HOME ================= -->
   <section class="screen active" id="screen-home" aria-label="Home Screen">
-    <header class="top-bar-clean">
-      <div class="brand-title">
-        <h1>Didode Music</h1>
+    <header class="app-header">
+      <div class="brand-block">
+        <h1>DIDODE</h1>
       </div>
-      <div class="top-badge">
-        <span class="live-dot"></span> Online
+      <div class="header-actions">
+        <label class="icon-btn-ghost upload-trigger" for="localFileInput" title="Upload Audio File" role="button" tabindex="0">＋</label>
+        <input type="file" id="localFileInput" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple style="display: none;">
+        <div class="top-status-badge">
+          <span class="pulse-dot"></span> <span id="driveStatusText">Connecting...</span>
+        </div>
       </div>
     </header>
 
-    <div class="screen-content home-layout">
-      <!-- Fixed Section (Search, 5 Featured Albums, Explore Albums) -->
-      <div class="home-fixed-section">
-        <div class="search-row">
-          <input type="text" id="searchInput" placeholder="Search songs, albums, or artists..." aria-label="Search songs">
-        </div>
+    <!-- Category Pill Filters -->
+    <nav class="category-pills" aria-label="Music Categories">
+      <button class="pill-chip active" data-filter="all">All</button>
+      <button class="pill-chip" data-filter="downloaded">Downloaded (Offline)</button>
+      <button class="pill-chip" data-filter="albums">Albums</button>
+      <button class="pill-chip" data-filter="favorites">Favorites</button>
+      <button class="pill-chip" data-filter="local">Local Files</button>
+    </nav>
 
-        <!-- Quick Favorites Banner -->
-        <div class="favorite-quick-banner" id="homeFavBanner" role="button" tabindex="0" aria-label="Open Favorites">
-          <div class="fav-banner-thumb">
-            <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/cover-a.png'">
-            <span class="fav-badge-icon">❤️</span>
-          </div>
-          <div class="fav-banner-meta">
-            <strong>Favorite Songs</strong>
-            <small id="homeFavCount">0 Songs saved</small>
-          </div>
-          <button class="play-circle-sm" id="homeFavPlayBtn" aria-label="Play Favorites">▶</button>
-        </div>
+    <!-- Scrollable Main Container -->
+    <div class="screen-content home-feed-scroll" id="homeFeedScrollArea">
+      
+      <!-- Search Input -->
+      <div class="search-box-row">
+        <svg class="search-icon-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Search songs, albums, artists..." aria-label="Search songs">
+      </div>
 
-        <!-- Section 1: Featured Albums (Top 5 Uniform Cards) -->
-        <div class="section-row">
-          <h3>Featured Albums</h3>
+      <!-- Search Results Dropdown -->
+      <div class="search-results-box" id="searchResultsBox" style="display: none;">
+        <div class="section-title-split">
+          <h3>Search Results</h3>
         </div>
-        <div class="main-album-carousel" id="homeMainAlbums">
-          <div class="main-album-card skeleton-card">
-            <div class="main-album-thumb skeleton"></div>
+        <div class="track-vertical-list" id="searchResultList"></div>
+      </div>
+
+      <!-- HERO EMBEDDED PLAYER CARD -->
+      <article class="hero-player-card" id="heroPlayerCard" role="region" aria-label="Active Track Showcase">
+        <div class="hero-ambient-glow" id="heroAmbientGlow"></div>
+        
+        <div class="hero-card-inner">
+          <div class="hero-card-top hero-expand-trigger" id="heroExpandTrigger" role="button" tabindex="0" title="Tap to open Full Player">
+            <div class="hero-cover-wrap">
+              <img id="heroArtwork" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
+            </div>
+            <div class="hero-meta">
+              <span class="hero-badge">NOW PLAYING</span>
+              <h2 id="heroTrackTitle">Select a Track</h2>
+              <p id="heroTrackArtist">Didode Music</p>
+            </div>
+            <button class="hero-heart-btn" id="heroLikeBtn" aria-label="Favorite Track">
+              <svg id="heroHeartSvg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Progress Seek Bar -->
+          <div class="hero-progress-wrap">
+            <input type="range" id="heroSeekBar" value="0" min="0" max="100" aria-label="Seek playback">
+            <div class="hero-time-row">
+              <span id="heroCurrentTime">0:00</span>
+              <span id="heroDurationTime">0:00</span>
+            </div>
+          </div>
+
+          <!-- Controls Row -->
+          <div class="hero-controls-row">
+            <button class="hero-ctrl-btn" id="heroShuffleBtn" title="Shuffle" aria-label="Shuffle">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+            </button>
+            <button class="hero-ctrl-btn" id="heroPrevBtn" title="Previous Track" aria-label="Previous">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="hero-play-circle" id="heroPlayBtn" title="Play or Pause" aria-label="Play">
+              <span id="heroPlayIcon">▶</span>
+            </button>
+            <button class="hero-ctrl-btn" id="heroNextBtn" title="Next Track" aria-label="Next">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
+            </button>
+            <button class="hero-ctrl-btn" id="heroRepeatBtn" title="Repeat Mode" aria-label="Repeat">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- Section: Recently Played -->
+      <section class="section-container" id="recentSectionContainer">
+        <div class="section-title-split">
+          <div class="title-with-pill">
+            <h3>Recently Played</h3>
+            <span class="count-pill-tag" id="recentCountTag">0</span>
+          </div>
+          <button class="text-link-btn" id="clearRecentBtn" style="display: none;">Clear</button>
+        </div>
+        <div class="horizontal-scroll-deck" id="recentCardsDeck"></div>
+      </section>
+
+      <!-- Section: Featured Albums -->
+      <section class="section-container" id="featuredSectionContainer">
+        <div class="section-title-split">
+          <div class="title-with-pill">
+            <h3>Explore Albums</h3>
+          </div>
+          <button class="text-link-btn" id="seeAllAlbumsBtn">See All →</button>
+        </div>
+        <div class="horizontal-scroll-deck featured-deck-expanded" id="featuredAlbumsDeck">
+          <div class="square-card skeleton-card">
+            <div class="square-thumb skeleton"></div>
             <strong>Connecting...</strong>
           </div>
         </div>
+      </section>
 
-        <!-- Section 2: Explore Albums (Uniform Clean Cards + See All) -->
-        <div class="section-row section-header-split">
-          <h3>Explore Albums</h3>
-          <button class="see-all-btn" id="seeAllAlbumsBtn">See All →</button>
+      <!-- Section: Dedicated Albums Grid -->
+      <section class="section-container" id="albumGridSection" style="display: none;">
+        <div class="section-title-split">
+          <h3>All Music Albums</h3>
+          <small id="albumTotalCount" class="status-indicator">0 Albums</small>
         </div>
-        <div class="explore-album-row" id="homeExploreAlbums">
-          <!-- Dynamically populated with uniform cards -->
-        </div>
+        <div class="albums-display-grid" id="albumsCategoryGrid"></div>
+      </section>
 
-        <!-- Section 3: Recently Played -->
-        <div class="section-row recent-header-row">
-          <h3>Recently Played</h3>
-          <button id="clearRecentBtn" class="clear-recent-btn" title="Clear Recently Played Tracks" style="display: none;">Clear</button>
-        </div>
-      </div>
-
-      <!-- Scrollable Recent List -->
-      <div class="home-scroll-section">
-        <div class="song-list" id="recentList"></div>
-      </div>
     </div>
   </section>
 
-  <!-- ============ 2. PLAYER SCREEN ============ -->
-  <section class="screen" id="screen-player" aria-label="Now Playing Screen">
+  <!-- ================= SCREEN 2: ALBUM DRILL-DOWN ================= -->
+  <section class="screen" id="screen-album-detail" aria-label="Album Detail Screen">
     <header class="top-bar">
-      <button class="icon-btn nav-back" data-target="screen-home" aria-label="Back to Home">
-        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M6 9l6 6 6-6"/></svg>
+      <button class="icon-btn" id="backToHomeBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="now-playing-label">
-        <span>Now Playing</span>
-        <small id="nowPlayingSource">Drive Playlist</small>
-      </div>
-      <div style="width: 42px;"></div>
+      <span class="detail-header-text" id="detailNavTitle">Album Details</span>
+      <div style="width: 38px;"></div>
     </header>
 
-    <div class="screen-content player-content">
-      <div class="artwork-wrap">
-        <img id="playerArtwork" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
-      </div>
-
-      <div class="visualizer-container">
-        <canvas id="equalizerCanvas" width="320" height="38"></canvas>
-      </div>
-
-      <div class="track-info">
-        <div class="track-meta">
-          <h2 id="trackTitle">No track loaded</h2>
-          <p id="trackArtist">—</p>
+    <div class="screen-content">
+      <div class="album-hero-banner">
+        <img id="detailCoverImg" src="assets/default-cover.png" alt="Cover" onerror="this.src='assets/cover-a.png'">
+        <div class="album-hero-info">
+          <h2 id="detailAlbumTitle">Album Name</h2>
+          <p id="detailTrackCount">0 Tracks</p>
+          <div class="detail-btn-row">
+            <button class="btn-primary-pill" id="detailPlayAllBtn">▶ Play All</button>
+            <button class="btn-download-pill" id="detailDownloadAlbumBtn" title="Download Entire Album" style="display: none;">
+              ⬇ Download Album
+            </button>
+            <button class="btn-danger-pill" id="detailClearFavBtn" style="display: none;">🗑 Clear All Favorites</button>
+            <button class="btn-danger-pill" id="detailClearLocalBtn" style="display: none;">🗑 Delete All Files</button>
+          </div>
         </div>
-        <button class="icon-btn heart-btn" id="likeBtn" aria-label="Favorite Track">
-          <svg id="heartSvg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        </button>
       </div>
 
-      <div class="seek-row">
-        <span id="currentTime">0:00</span>
-        <input type="range" id="seekBar" value="0" min="0" max="100" aria-label="Seek playback">
-        <span id="durationTime">0:00</span>
+      <div class="track-vertical-list" id="detailSongList"></div>
+    </div>
+  </section>
+
+  <!-- ================= SCREEN 3: NOW PLAYING FULL VIEW ================= -->
+  <section class="screen" id="screen-player-full" aria-label="Full Player Screen">
+    <header class="top-bar">
+      <button class="icon-btn nav-back-home" aria-label="Minimize">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="player-header-title">
+        <span>Now Playing</span>
+        <small id="fullPlayerSource">Drive Audio</small>
+      </div>
+      <div style="width: 38px;"></div>
+    </header>
+
+    <div class="screen-content full-player-layout">
+      <div class="full-artwork-container">
+        <img id="fullArtwork" src="assets/default-cover.png" alt="Cover" onerror="this.src='assets/cover-a.png'">
       </div>
 
-      <div class="transport-row">
-        <button class="icon-btn ctrl-btn" id="shuffleBtn" aria-label="Shuffle">
+      <div class="visualizer-bar-box">
+        <canvas id="equalizerCanvas" width="300" height="36"></canvas>
+      </div>
+
+      <div class="full-track-meta">
+        <div>
+          <h2 id="fullTrackTitle">No track loaded</h2>
+          <p id="fullTrackArtist">—</p>
+        </div>
+        <div class="full-action-btns-group">
+          <button class="full-download-btn" id="fullDownloadActionBtn" title="Download to Phone Storage" aria-label="Download to phone">
+            ⬇
+          </button>
+          <button class="hero-heart-btn" id="fullLikeBtn" aria-label="Favorite">
+            <svg id="fullHeartSvg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="hero-progress-wrap">
+        <input type="range" id="fullSeekBar" value="0" min="0" max="100" aria-label="Seek playback">
+        <div class="hero-time-row">
+          <span id="fullCurrentTime">0:00</span>
+          <span id="fullDurationTime">0:00</span>
+        </div>
+      </div>
+
+      <div class="hero-controls-row big-transport">
+        <button class="hero-ctrl-btn" id="fullShuffleBtn" aria-label="Shuffle">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
         </button>
-        
-        <button class="icon-btn ctrl-btn" id="prevBtn" aria-label="Previous Track">
+        <button class="hero-ctrl-btn" id="fullPrevBtn" aria-label="Previous">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
-        
-        <button class="play-circle big" id="playPauseBtn" aria-label="Play or Pause">
-          <span id="playIcon">▶</span>
+        <button class="hero-play-circle giant" id="fullPlayBtn" aria-label="Play">
+          <span id="fullPlayIcon">▶</span>
         </button>
-        
-        <button class="icon-btn ctrl-btn" id="nextBtn" aria-label="Next Track">
+        <button class="hero-ctrl-btn" id="fullNextBtn" aria-label="Next">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
         </button>
-        
-        <button class="icon-btn ctrl-btn" id="repeatBtn" aria-label="Repeat Mode">
+        <button class="hero-ctrl-btn" id="fullRepeatBtn" aria-label="Repeat">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         </button>
       </div>
 
-      <div class="volume-row">
-        <button class="icon-btn vol-btn" id="muteBtn" aria-label="Mute Audio">
-          <svg id="volSvg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>`;
+      <div class="volume-slider-row">
+        <button class="volume-mute-btn" id="fullMuteBtn" aria-label="Mute Audio">
+          <svg id="fullVolSvg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
         </button>
-        <input type="range" id="volumeSlider" min="0" max="100" value="100" aria-label="Adjust Volume">
-      </div>
-
-      <audio id="audioEl" preload="auto"></audio>
-    </div>
-  </section>
-
-  <!-- ============ 3. LIBRARY SCREEN ============ -->
-  <section class="screen" id="screen-library" aria-label="Library Screen">
-    <header class="top-bar">
-      <h2>My Library</h2>
-      <div class="top-bar-actions">
-        <label class="icon-btn upload-label" for="localFileInput" title="Upload Audio Files" role="button" tabindex="0">＋</label>
-        <input type="file" id="localFileInput" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple style="display: none;">
-      </div>
-    </header>
-
-    <div class="screen-content">
-      <div class="tab-row" id="libraryTabsRow">
-        <button class="tab-btn active" data-tab="playlists">All Albums</button>
-        <button class="tab-btn" data-tab="songs">All Songs</button>
-        <button class="tab-btn" data-tab="local">Local Files</button>
-      </div>
-
-      <!-- Panel: All Albums List -->
-      <div class="tab-panel active" id="panel-playlists">
-        <div id="libraryAlbumList">
-          <div class="playlist-row" data-album-id="FAV">
-            <img src="assets/cover-fav.png" alt="Favorites Cover" onerror="this.src='assets/default-cover.png'">
-            <div><strong>Favorites</strong><small id="countFav">0 Songs</small></div>
-            <button class="row-play-btn" data-play-album="FAV" title="Play All">▶</button>
-          </div>
-
-          <div class="playlist-row" data-album-id="LOCAL">
-            <img src="assets/cover-local.png" alt="Device Files Cover" onerror="this.onerror=null;this.src='assets/default-cover.png';">
-            <div><strong>Device Files (Local)</strong><small id="countLocal">0 Files</small></div>
-            <button class="row-play-btn" data-play-album="LOCAL" title="Play All">▶</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Panel: Album Drill-Down View -->
-      <div class="tab-panel" id="panel-volume-detail">
-        <div class="vol-detail-header">
-          <button id="backToVolumesBtn" class="back-link">← Back to Albums</button>
-          <div class="vol-detail-banner">
-            <img id="volDetailCover" src="assets/default-cover.png" alt="Album Cover" onerror="this.src='assets/cover-a.png'">
-            <div class="vol-detail-info">
-              <h3 id="volDetailTitle">Album Name</h3>
-              <p id="volDetailSubtitle">0 Tracks</p>
-              <div class="detail-actions">
-                <button id="volDetailPlayAllBtn" class="detail-play-all">▶ Play All</button>
-                <button id="clearFavsInDetailBtn" class="detail-del-album" style="display: none;">🗑 Clear All Favorites</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="song-list" id="volDetailSongList"></div>
-      </div>
-
-      <!-- Panel: All Songs -->
-      <div class="tab-panel" id="panel-songs">
-        <div class="song-list" id="allSongsList">
-          <p class="status-text" id="driveStatus">Connecting to Google Drive folder...</p>
-        </div>
-      </div>
-
-      <!-- Panel: Local Files -->
-      <div class="tab-panel" id="panel-local">
-        <div class="local-upload-box" id="dropZone">
-          <div class="upload-btn-group">
-            <label for="localFileInput" class="upload-cta-btn">
-              <span>📁 Select Audio Files</span>
-            </label>
-            <button id="clearAllLocalBtn" class="clean-all-btn" title="Clear all uploaded tracks" style="display: none;">
-              <span>🗑 Clear All</span>
-            </button>
-          </div>
-          <small>Permanent storage in device (IndexedDB)</small>
-        </div>
-        
-        <div class="song-list" id="localSongsList">
-          <p class="status-text" id="localEmptyStatus">No local songs uploaded yet.</p>
-        </div>
+        <input type="range" id="fullVolumeSlider" min="0" max="100" value="100" aria-label="Volume">
       </div>
     </div>
   </section>
 
-  <!-- ============ BOTTOM NAV ============ -->
-  <nav class="bottom-nav">
-    <button class="nav-btn active" data-target="screen-home"><span>🏠</span>Home</button>
-    <button class="nav-btn" data-target="screen-player"><span>🎵</span>Player</button>
-    <button class="nav-btn" data-target="screen-library"><span>📚</span>Library</button>
+  <!-- ================= FLOATING DOCKED BOTTOM MINI PLAYER ================= -->
+  <footer class="docked-bottom-bar" id="dockedPlayerBar" role="region" aria-label="Mini Player">
+    <div class="docked-left-clickable" id="dockedExpandBtn">
+      <img id="dockedArtwork" src="assets/default-cover.png" alt="Artwork" onerror="this.src='assets/cover-a.png'">
+      <div class="docked-meta">
+        <strong id="dockedTrackTitle">No track loaded</strong>
+        <small id="dockedTrackArtist">Didode Music</small>
+      </div>
+    </div>
+    <div class="docked-right-controls">
+      <button class="docked-action-btn" id="dockedPrevBtn" title="Previous" aria-label="Previous">⏮</button>
+      <button class="docked-play-pill" id="dockedPlayBtn" title="Play or Pause" aria-label="Play">▶</button>
+      <button class="docked-action-btn" id="dockedNextBtn" title="Next" aria-label="Next">⏭</button>
+    </div>
+  </footer>
+
+  <!-- ================= BOTTOM NAVIGATION TABS ================= -->
+  <nav class="bottom-nav-bar" aria-label="Main Navigation">
+    <button class="nav-tab-item active" data-nav="home">
+      <span class="nav-tab-icon">🏠</span>
+      <span class="nav-tab-label">Home</span>
+    </button>
+    <button class="nav-tab-item" data-nav="player">
+      <span class="nav-tab-icon">🎵</span>
+      <span class="nav-tab-label">Player</span>
+    </button>
+    <button class="nav-tab-item" data-nav="library">
+      <span class="nav-tab-icon">📚</span>
+      <span class="nav-tab-label">Library</span>
+    </button>
   </nav>
 
-  <!-- ============ CUSTOM IN-APP CONFIRMATION MODAL ============ -->
+  <audio id="audioEl" preload="auto"></audio>
+
+  <!-- ================= BEAUTIFUL IN-APP ALARM / CONFIRMATION MODAL ================= -->
   <div class="custom-modal-backdrop" id="customModal">
     <div class="custom-modal-box">
-      <div class="modal-icon" id="modalIcon">🗑️</div>
-      <h3 id="modalTitle">Confirm Action</h3>
+      <div class="modal-pulse-ring"></div>
+      <div class="modal-icon" id="modalIcon">⚠️</div>
+      <h3 id="modalTitle">Notice</h3>
       <p id="modalDesc">Are you sure you want to proceed?</p>
       <div class="modal-actions">
         <button id="modalCancelBtn" class="modal-btn cancel-btn">Cancel</button>
-        <button id="modalConfirmBtn" class="modal-btn confirm-btn">Confirm</button>
+        <button id="modalConfirmBtn" class="modal-btn confirm-btn">OK</button>
       </div>
     </div>
   </div>
@@ -255,6 +318,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/db.js"></script>
+<script src="js/storage.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
