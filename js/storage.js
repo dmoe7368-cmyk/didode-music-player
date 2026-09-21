@@ -1,22 +1,20 @@
 // ==========================================================================
-// DIDODE - Storage & Share Service for Android/Web
+// DIDODE - Optimized Web & PWA Direct Download Engine
 // ==========================================================================
+
+const STORAGE_FOLDER = "DidodeMusic";
 
 function hasNativeFilesystem() {
   return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Filesystem");
 }
 
-function hasSharePlugin() {
-  return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Share");
-}
-
-// 1. Check if file exists in App Storage / IndexedDB
+// 1. Check physical existence
 async function isFilePhysicallyPresent(fileName) {
   if (hasNativeFilesystem()) {
     try {
       const { Filesystem, Directory } = Capacitor.Plugins;
       await Filesystem.stat({
-        path: `DidodeMusic/${fileName}`,
+        path: `${STORAGE_FOLDER}/${fileName}`,
         directory: Directory.Documents
       });
       return true;
@@ -33,7 +31,7 @@ async function isFilePhysicallyPresent(fileName) {
   }
 }
 
-// 2. Download and Optionally Trigger Android Share Sheet
+// 2. Direct Download (Triggers Phone's Public Download Folder directly)
 async function downloadAudioToPhoneStorage(song, signal, onProgress) {
   const fileName = `${song.name.replace(/[^a-zA-Z0-9_\-\u1000-\u109F]/g, "_")}.mp3`;
 
@@ -55,35 +53,33 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
 
     try {
       await Filesystem.mkdir({
-        path: "DidodeMusic",
+        path: STORAGE_FOLDER,
         directory: Directory.Documents,
         recursive: true
       });
     } catch (ignore) {}
 
     const result = await Filesystem.writeFile({
-      path: `DidodeMusic/${fileName}`,
+      path: `${STORAGE_FOLDER}/${fileName}`,
       data: base64Data,
       directory: Directory.Documents
     });
 
-    savedLocationPath = result.uri;
-
-    // Automatically trigger Android Share/Save Dialog so user can place it in Download/Music folder
-    if (hasSharePlugin() && Capacitor.getPlatform() === 'android') {
-      try {
-        await Capacitor.Plugins.Share.share({
-          title: song.name,
-          text: 'Save your downloaded music file:',
-          url: result.uri,
-          dialogTitle: 'Save Music File'
-        });
-      } catch (shareErr) {
-        console.warn("Share sheet dismissed or unavailable:", shareErr);
-      }
-    }
+    savedLocationPath = result.uri || `/storage/emulated/0/Documents/${STORAGE_FOLDER}/${fileName}`;
   } else {
-    // Web / PWA Fallback
+    // Website View / PWA Browser Environment:
+    // Triggers direct browser download straight to Phone's Download folder
+    const blobUrl = URL.createObjectURL(blob);
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.href = blobUrl;
+    downloadAnchor.download = fileName;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+    
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+    // Cache internally for seamless offline web app playback
     await saveDownloadedTrackToDB({
       id: song.id,
       fileName: fileName,
@@ -94,7 +90,8 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
       albumId: song.albumId,
       isDownloaded: true
     });
-    savedLocationPath = `App Storage (IndexedDB) -> ${fileName}`;
+
+    savedLocationPath = `Internal Storage -> Download/${fileName}`;
   }
 
   return { fileName, filePath: savedLocationPath };
@@ -106,7 +103,7 @@ async function deleteAudioFromPhoneStorage(fileName, songId) {
     try {
       const { Filesystem, Directory } = Capacitor.Plugins;
       await Filesystem.deleteFile({
-        path: `DidodeMusic/${fileName}`,
+        path: `${STORAGE_FOLDER}/${fileName}`,
         directory: Directory.Documents
       });
     } catch (err) {
