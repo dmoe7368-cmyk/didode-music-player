@@ -1,5 +1,5 @@
 // ==========================================================================
-// DIDODE - Optimized Web & PWA Direct Download Engine
+// DIDODE - Storage Manager (DidodeMusic Folder Creator)
 // ==========================================================================
 
 const STORAGE_FOLDER = "DidodeMusic";
@@ -8,30 +8,6 @@ function hasNativeFilesystem() {
   return typeof Capacitor !== "undefined" && Capacitor.isPluginAvailable("Filesystem");
 }
 
-// 1. Check physical existence
-async function isFilePhysicallyPresent(fileName) {
-  if (hasNativeFilesystem()) {
-    try {
-      const { Filesystem, Directory } = Capacitor.Plugins;
-      await Filesystem.stat({
-        path: `${STORAGE_FOLDER}/${fileName}`,
-        directory: Directory.Documents
-      });
-      return true;
-    } catch (e) {
-      return false;
-    }
-  } else {
-    try {
-      const all = await getDownloadedTracksFromDB();
-      return all.some(t => t.fileName === fileName);
-    } catch (e) {
-      return false;
-    }
-  }
-}
-
-// 2. Direct Download (Triggers Phone's Public Download Folder directly)
 async function downloadAudioToPhoneStorage(song, signal, onProgress) {
   const fileName = `${song.name.replace(/[^a-zA-Z0-9_\-\u1000-\u109F]/g, "_")}.mp3`;
 
@@ -67,8 +43,7 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
 
     savedLocationPath = result.uri || `/storage/emulated/0/Documents/${STORAGE_FOLDER}/${fileName}`;
   } else {
-    // Website View / PWA Browser Environment:
-    // Triggers direct browser download straight to Phone's Download folder
+    // Web / Vercel Website View: Triggers browser download directly
     const blobUrl = URL.createObjectURL(blob);
     const downloadAnchor = document.createElement("a");
     downloadAnchor.href = blobUrl;
@@ -79,7 +54,7 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
     
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
-    // Cache internally for seamless offline web app playback
+    // Save internally into IndexedDB for instant offline playback
     await saveDownloadedTrackToDB({
       id: song.id,
       fileName: fileName,
@@ -91,28 +66,10 @@ async function downloadAudioToPhoneStorage(song, signal, onProgress) {
       isDownloaded: true
     });
 
-    savedLocationPath = `Internal Storage -> Download/${fileName}`;
+    savedLocationPath = `Download/${STORAGE_FOLDER}/${fileName}`;
   }
 
   return { fileName, filePath: savedLocationPath };
-}
-
-// 3. Delete Physical File
-async function deleteAudioFromPhoneStorage(fileName, songId) {
-  if (hasNativeFilesystem()) {
-    try {
-      const { Filesystem, Directory } = Capacitor.Plugins;
-      await Filesystem.deleteFile({
-        path: `${STORAGE_FOLDER}/${fileName}`,
-        directory: Directory.Documents
-      });
-    } catch (err) {
-      console.warn("Native file delete error:", err);
-    }
-  }
-  try {
-    await deleteDownloadedTrackFromDB(songId);
-  } catch (e) {}
 }
 
 function blobToBase64(blob) {
