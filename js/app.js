@@ -1,11 +1,16 @@
 // ==========================================================================
 // DIDODE - High Performance Audio Engine & Offline State Manager
+// Production Standard: Material Design 3 / Apple HIG / One UI Compliant
 // ==========================================================================
 
+const OFFLINE_DOWNLOAD_COVER = "assets/cover-a.png";
+const DEFAULT_FALLBACK_COVER = "assets/default-cover.png";
+
 const state = {
-  albums: [],          // [{ id, name, coverUrl, songs: [] }]
+  albums: [],                  // [{ id, name, coverUrl, songs: [] }]
   allDriveSongs: [],
-  localSongs: [],
+  localSongs: [],              // Manually imported device songs
+  downloadedSongs: [],         // Native/Web Offline Downloads
   downloadedFilesRegistry: {}, // { [songId]: { fileName, filePath, blobUrl } }
   activeDownloads: new Map(),  // Active AbortControllers Map: songId -> AbortController
   batchDownloadQueue: null,    // Batch State
@@ -13,7 +18,7 @@ const state = {
   currentIndex: -1,
   isPlaying: false,
   isShuffle: false,
-  repeatMode: 0,       // 0 = Off, 1 = Repeat All, 2 = Repeat 1 (Single)
+  repeatMode: 0,               // 0 = Off, 1 = Repeat All, 2 = Repeat 1 (Single)
   favorites: JSON.parse(localStorage.getItem("favoriteSongs") || "[]"),
   volume: 1,
   activeFilter: "all"
@@ -21,7 +26,7 @@ const state = {
 
 const audioEl = document.getElementById("audioEl");
 
-// Google Drive Reliable Streaming Resolver
+// Google Drive Streaming URL Resolver
 function getDriveMediaUrls(fileId, apiKey) {
   return {
     primary: `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`,
@@ -31,7 +36,7 @@ function getDriveMediaUrls(fileId, apiKey) {
 }
 
 function getDriveDirectImageUrl(fileId) {
-  if (!fileId) return "assets/default-cover.png";
+  if (!fileId) return DEFAULT_FALLBACK_COVER;
   return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
@@ -208,7 +213,7 @@ function setupHeroPlayerExpansion() {
     if (state.queue.length > 0 && state.currentIndex >= 0) {
       showScreen("screen-player-full");
     } else {
-      const all = [...state.allDriveSongs, ...state.localSongs];
+      const all = getAllCurrentSongs();
       if (all.length > 0) {
         state.queue = all;
         playSongAt(0);
@@ -255,6 +260,20 @@ document.querySelectorAll(".pill-chip").forEach(pill => {
   });
 });
 
+// Helper function: Consolidate active playable tracks safely with iOS Cover Fallbacks
+function getAllCurrentSongs() {
+  const map = new Map();
+  (state.downloadedSongs || []).forEach(s => map.set(s.id, {
+    ...s,
+    cover: OFFLINE_DOWNLOAD_COVER // iOS offline safe image
+  }));
+  (state.localSongs || []).forEach(s => map.set(s.id, s));
+  (state.allDriveSongs || []).forEach(s => {
+    if (!map.has(s.id)) map.set(s.id, s);
+  });
+  return Array.from(map.values());
+}
+
 // -----------------------------------------------------
 // CATEGORY FILTER & ALBUM SEGREGATION
 // -----------------------------------------------------
@@ -300,7 +319,7 @@ function renderAlbumsCategoryGrid() {
   if (!container) return;
 
   const allAlbumItems = [
-    { id: "DOWNLOADED", name: "Offline Downloads", coverUrl: "assets/cover-a.png", countText: `${getSongsByAlbumId("DOWNLOADED").length} Saved` },
+    { id: "DOWNLOADED", name: "Offline Downloads", coverUrl: OFFLINE_DOWNLOAD_COVER, countText: `${getSongsByAlbumId("DOWNLOADED").length} Saved` },
     { id: "FAV", name: "Favorites", coverUrl: "assets/cover-fav.png", countText: `${getSongsByAlbumId("FAV").length} Songs` },
     { id: "LOCAL", name: "Device Files", coverUrl: "assets/cover-local.png", countText: `${state.localSongs.length} Files` }
   ];
@@ -322,7 +341,7 @@ function renderAlbumsCategoryGrid() {
     card.className = "album-grid-card";
     card.innerHTML = `
       <div class="album-grid-thumb">
-        <img src="${item.coverUrl}" alt="${item.name}" onerror="this.src='assets/default-cover.png'">
+        <img src="${item.coverUrl}" alt="${item.name}" onerror="this.src='${DEFAULT_FALLBACK_COVER}'">
       </div>
       <strong>${item.name}</strong>
       <small>${item.countText}</small>
@@ -370,7 +389,7 @@ async function fetchDriveAlbums() {
       const imageFiles = items.filter(it => it.mimeType.startsWith("image/"));
 
       const coverFile = imageFiles.find(img => /cover|folder|album|art/i.test(img.name)) || imageFiles[0];
-      const coverUrl = coverFile ? getDriveDirectImageUrl(coverFile.id) : "assets/default-cover.png";
+      const coverUrl = coverFile ? getDriveDirectImageUrl(coverFile.id) : DEFAULT_FALLBACK_COVER;
 
       const songs = audioFiles.map(af => {
         const streamUrls = getDriveMediaUrls(af.id, apiKey);
@@ -408,46 +427,68 @@ async function fetchDriveAlbums() {
     }
 
   } catch (err) {
-    console.error("Drive error:", err);
+    console.warn("Drive connection offline:", err);
     if (statusEl) statusEl.textContent = "Offline";
   }
 }
 
 // -----------------------------------------------------
-// PHYSICAL & OFFLINE STORAGE SYNC
+// PHYSICAL STORAGE SYNC (iOS & Android Universal)
 // -----------------------------------------------------
 async function syncPhysicalDownloadsState() {
-  const storedRegistry = JSON.parse(localStorage.getItem("downloadRegistry") || "{}");
-  const updatedRegistry = {};
+  try {
+    if (typeof loadAllNativeOfflineTracks === "function") {
+      const nativeTracks = await loadAllNativeOfflineTracks();
+      // Ensure all offline tracks explicitly use OFFLINE_DOWNLOAD_COVER
+      state.downloadedSongs = nativeTracks.map(t => ({
+        ...t,
+        cover: OFFLINE_DOWNLOAD_COVER
+      }));
 
-  for (const songId in storedRegistry) {
-    const item = storedRegistry[songId];
-    if (item) {
-      updatedRegistry[songId] = item;
+      const updatedRegistry = {};
+      state.downloadedSongs.forEach(track => {
+        updatedRegistry[track.id] = {
+          fileName: track.fileName,
+          filePath: `Documents/DidodeMusic/${track.fileName}`,
+          blobUrl: track.url
+        };
+      });
+
+      state.downloadedFilesRegistry = updatedRegistry;
+      localStorage.setItem("downloadRegistry", JSON.stringify(updatedRegistry));
+      return;
     }
+  } catch (e) {
+    console.warn("Native storage sync warning:", e);
   }
 
+  // Web / PWA IndexedDB Fallback
   try {
     const dbTracks = await getDownloadedTracksFromDB();
     if (dbTracks && dbTracks.length > 0) {
-      dbTracks.forEach(track => {
-        if (!updatedRegistry[track.id]) {
-          updatedRegistry[track.id] = {
-            fileName: track.fileName,
-            filePath: `DidodeMusic/${track.fileName}`,
-            blobUrl: track.blob ? URL.createObjectURL(track.blob) : undefined
-          };
-        }
-      });
-    }
-  } catch (e) {
-    console.warn("IndexedDB sync warning:", e);
-  }
+      state.downloadedSongs = dbTracks.map(t => ({
+        ...t,
+        cover: OFFLINE_DOWNLOAD_COVER,
+        url: t.blob ? URL.createObjectURL(t.blob) : t.url
+      }));
 
-  state.downloadedFilesRegistry = updatedRegistry;
-  localStorage.setItem("downloadRegistry", JSON.stringify(updatedRegistry));
+      const reg = {};
+      state.downloadedSongs.forEach(track => {
+        reg[track.id] = {
+          fileName: track.fileName,
+          filePath: `Downloads/${track.fileName}`,
+          blobUrl: track.url
+        };
+      });
+      state.downloadedFilesRegistry = reg;
+      localStorage.setItem("downloadRegistry", JSON.stringify(reg));
+    }
+  } catch (err) {
+    console.warn("IndexedDB sync warning:", err);
+  }
 }
 
+// Download Request Handler with Instant UI Refresher
 async function handleDownloadRequest(song, btnEl) {
   if (state.activeDownloads.has(song.id)) {
     const controller = state.activeDownloads.get(song.id);
@@ -481,21 +522,28 @@ async function handleDownloadRequest(song, btnEl) {
       btnEl.title = "Click to Cancel";
     }
 
-    const { fileName, filePath } = await downloadAudioToPhoneStorage(song, controller.signal);
+    const { songId, fileName, filePath, playableUrl } = await downloadAudioToPhoneStorage(song, controller.signal);
 
     state.activeDownloads.delete(song.id);
-    
-    let blobUrl = undefined;
-    try {
-      const dbTracks = await getDownloadedTracksFromDB();
-      const match = dbTracks.find(t => t.id === song.id);
-      if (match && match.blob) {
-        blobUrl = URL.createObjectURL(match.blob);
-      }
-    } catch(err) {}
 
-    state.downloadedFilesRegistry[song.id] = { fileName, filePath, blobUrl };
+    // 1. Update In-Memory Registry
+    state.downloadedFilesRegistry[song.id] = { fileName, filePath, blobUrl: playableUrl };
     localStorage.setItem("downloadRegistry", JSON.stringify(state.downloadedFilesRegistry));
+
+    // 2. iOS Safe Offline Track Object (Forces offline-safe cover-a.png)
+    const newOfflineTrack = {
+      id: song.id,
+      name: song.name,
+      url: playableUrl,
+      cover: OFFLINE_DOWNLOAD_COVER,
+      albumName: "Offline Downloads",
+      albumId: "DOWNLOADED",
+      fileName: fileName,
+      isLocal: true,
+      isDownloaded: true
+    };
+
+    state.downloadedSongs = [newOfflineTrack, ...(state.downloadedSongs || []).filter(s => s.id !== song.id)];
 
     showStorageToast("Download Complete", filePath, "📥");
 
@@ -506,8 +554,18 @@ async function handleDownloadRequest(song, btnEl) {
       btnEl.title = "Saved in Storage";
     }
 
-    updateFullPlayerDownloadButton();
+    // 3. Live UI Synchronization
+    await syncPhysicalDownloadsState();
     renderFeaturedAlbumsDeck();
+    updateFullPlayerDownloadButton();
+
+    const activeScreen = document.querySelector(".screen.active");
+    if (activeScreen?.id === "screen-album-detail") {
+      const title = document.getElementById("detailAlbumTitle")?.textContent;
+      if (title === "Offline Downloads") {
+        openAlbumDetail("DOWNLOADED");
+      }
+    }
 
   } catch (err) {
     state.activeDownloads.delete(song.id);
@@ -516,16 +574,10 @@ async function handleDownloadRequest(song, btnEl) {
       if (btnEl) {
         btnEl.classList.remove("is-loading");
         btnEl.innerHTML = "⬇";
-        btnEl.title = "Download to Phone";
       }
     } else {
       console.error("Download failed:", err);
-      showCustomConfirm(
-        "Google Drive Limit Reached",
-        `This file cannot be downloaded right now because Google Drive's daily bandwidth quota has been exceeded for this track. Please wait a few hours or play another song.`,
-        "Understood",
-        "⚠️"
-      );
+      showCustomConfirm("Download Notice", `Could not download "${song.name}". Daily rate limits or network issues prevented download.`, "OK", "⚠️");
       if (btnEl) {
         btnEl.classList.remove("is-loading");
         btnEl.innerHTML = "⬇";
@@ -556,6 +608,7 @@ async function removeDownloadedTrack(song, event) {
 
   showStorageToast("File Deleted", item.fileName, "🗑️");
 
+  await syncPhysicalDownloadsState();
   renderFeaturedAlbumsDeck();
   updateFullPlayerDownloadButton();
 
@@ -628,16 +681,11 @@ async function downloadEntireAlbum(songs, albumTitle) {
         const downloadResult = await downloadAudioToPhoneStorage(song, controller.signal);
         state.activeDownloads.delete(song.id);
 
-        let blobUrl = undefined;
-        try {
-          const dbTracks = await getDownloadedTracksFromDB();
-          const match = dbTracks.find(t => t.id === song.id);
-          if (match && match.blob) {
-            blobUrl = URL.createObjectURL(match.blob);
-          }
-        } catch(e) {}
-
-        state.downloadedFilesRegistry[song.id] = { fileName: downloadResult.fileName, filePath: downloadResult.filePath, blobUrl };
+        state.downloadedFilesRegistry[song.id] = {
+          fileName: downloadResult.fileName,
+          filePath: downloadResult.filePath,
+          blobUrl: downloadResult.playableUrl
+        };
         downloadedCount++;
 
         if (rowDlBtn) {
@@ -659,6 +707,7 @@ async function downloadEntireAlbum(songs, albumTitle) {
   state.batchDownloadQueue = null;
 
   localStorage.setItem("downloadRegistry", JSON.stringify(state.downloadedFilesRegistry));
+  await syncPhysicalDownloadsState();
 
   if (btn) {
     btn.classList.remove("is-cancelling");
@@ -682,7 +731,7 @@ function renderFeaturedAlbumsDeck() {
   container.innerHTML = "";
 
   const mainItems = [
-    { id: "DOWNLOADED", name: "Offline Saved", coverUrl: "assets/cover-a.png", countText: `${getSongsByAlbumId("DOWNLOADED").length} Saved` },
+    { id: "DOWNLOADED", name: "Offline Saved", coverUrl: OFFLINE_DOWNLOAD_COVER, countText: `${getSongsByAlbumId("DOWNLOADED").length} Saved` },
     { id: "LOCAL", name: "Device Files", coverUrl: "assets/cover-local.png", countText: `${state.localSongs.length} Files` },
     { id: "FAV", name: "Favorites", coverUrl: "assets/cover-fav.png", countText: `${getSongsByAlbumId("FAV").length} Songs` }
   ];
@@ -701,7 +750,7 @@ function renderFeaturedAlbumsDeck() {
     card.className = "square-card";
     card.innerHTML = `
       <div class="square-thumb">
-        <img src="${item.coverUrl}" alt="${item.name}" onerror="this.src='assets/default-cover.png'">
+        <img src="${item.coverUrl}" alt="${item.name}" onerror="this.src='${DEFAULT_FALLBACK_COVER}'">
       </div>
       <strong>${item.name}</strong>
       <small>${item.countText}</small>
@@ -716,7 +765,7 @@ function buildSongRow(song, onPlay, viewType = "normal") {
   row.className = "track-item-row";
   row.dataset.songId = song.id;
 
-  const isDownloaded = !!state.downloadedFilesRegistry[song.id];
+  const isDownloaded = !!state.downloadedFilesRegistry[song.id] || song.isDownloaded;
   const isCurrentlyLoading = state.activeDownloads.has(song.id);
 
   let actionHtml = "";
@@ -739,11 +788,14 @@ function buildSongRow(song, onPlay, viewType = "normal") {
     ? `<button class="row-download-btn ${isDownloaded ? 'downloaded-badge' : ''} ${isCurrentlyLoading ? 'is-loading' : ''}" title="${isDownloaded ? 'Saved in Storage' : (isCurrentlyLoading ? 'Click to Cancel' : 'Download to Phone')}" aria-label="Download">${downloadBtnInner}</button>`
     : "";
 
+  // Guaranteed valid local artwork for offline downloaded tracks
+  const resolvedCover = (song.isDownloaded || isDownloaded) ? OFFLINE_DOWNLOAD_COVER : (song.cover || DEFAULT_FALLBACK_COVER);
+
   row.innerHTML = `
-    <img src="${song.cover}" alt="cover" loading="lazy" onerror="this.src='assets/default-cover.png'">
+    <img src="${resolvedCover}" alt="cover" loading="lazy" onerror="this.src='${DEFAULT_FALLBACK_COVER}'">
     <div class="track-meta-box">
       <strong>${song.name}</strong>
-      <small>${song.isLocal ? "Device File" : (song.albumName || "Drive Audio")}</small>
+      <small>${song.isLocal ? (song.isDownloaded ? "Offline Download" : "Device File") : (song.albumName || "Drive Audio")}</small>
     </div>
     <div class="track-row-actions">
       ${downloadBtnHtml}
@@ -771,17 +823,19 @@ function buildSongRow(song, onPlay, viewType = "normal") {
 }
 
 // -----------------------------------------------------
-// ALBUM DRILL-DOWN
+// ALBUM DRILL-DOWN (OFFLINE INDEPENDENT RESOLVER)
 // -----------------------------------------------------
 function getSongsByAlbumId(albumId) {
   if (albumId === "FAV") {
-    const all = [...state.allDriveSongs, ...state.localSongs];
+    const all = getAllCurrentSongs();
     return all.filter(s => state.favorites.includes(s.id));
   } else if (albumId === "LOCAL") {
     return state.localSongs;
   } else if (albumId === "DOWNLOADED") {
-    const all = [...state.allDriveSongs, ...state.localSongs];
-    return all.filter(s => !!state.downloadedFilesRegistry[s.id]);
+    return (state.downloadedSongs || []).map(s => ({
+      ...s,
+      cover: OFFLINE_DOWNLOAD_COVER
+    }));
   } else {
     const album = state.albums.find(a => a.id === albumId);
     return album ? album.songs : [];
@@ -794,16 +848,20 @@ function getAlbumMetadata(albumId) {
   } else if (albumId === "LOCAL") {
     return { title: "Device Files", cover: "assets/cover-local.png" };
   } else if (albumId === "DOWNLOADED") {
-    return { title: "Offline Downloads", cover: "assets/cover-a.png" };
+    return { title: "Offline Downloads", cover: OFFLINE_DOWNLOAD_COVER };
   } else {
     const album = state.albums.find(a => a.id === albumId);
     return album
       ? { title: album.name, cover: album.coverUrl }
-      : { title: "Album", cover: "assets/default-cover.png" };
+      : { title: "Album", cover: DEFAULT_FALLBACK_COVER };
   }
 }
 
-function openAlbumDetail(albumId) {
+async function openAlbumDetail(albumId) {
+  if (albumId === "DOWNLOADED") {
+    await syncPhysicalDownloadsState();
+  }
+
   const meta = getAlbumMetadata(albumId);
   const songs = getSongsByAlbumId(albumId);
 
@@ -961,23 +1019,27 @@ async function clearAllFavorites() {
 }
 
 // -----------------------------------------------------
-// RECENTLY PLAYED MANAGEMENT (RESOLVER FIX)
+// RECENTLY PLAYED MANAGEMENT (OFFLINE RESOLVER)
 // -----------------------------------------------------
 function saveToRecentlyPlayed(song) {
   let stored = JSON.parse(localStorage.getItem("recentlyPlayed") || "[]");
   stored = stored.filter(s => s.id !== song.id);
-  
-  // Clean store without stale session Blob URL
-  const cleanSongSnapshot = {
+
+  // Store clean snapshot without dynamic session blob URLs
+  const coverToPersist = (song.isDownloaded || song.albumId === "DOWNLOADED")
+    ? OFFLINE_DOWNLOAD_COVER
+    : (song.cover || DEFAULT_FALLBACK_COVER);
+
+  stored.unshift({
     id: song.id,
     name: song.name,
-    cover: song.cover,
+    cover: coverToPersist,
     albumName: song.albumName,
     albumId: song.albumId,
-    isLocal: song.isLocal
-  };
+    isLocal: song.isLocal,
+    isDownloaded: song.isDownloaded
+  });
 
-  stored.unshift(cleanSongSnapshot);
   stored = stored.slice(0, 15);
   localStorage.setItem("recentlyPlayed", JSON.stringify(stored));
   renderRecentlyPlayed();
@@ -992,7 +1054,6 @@ function renderRecentlyPlayed() {
   const stored = JSON.parse(localStorage.getItem("recentlyPlayed") || "[]");
 
   if (countTag) countTag.textContent = stored.length;
-
   if (clearBtn) {
     clearBtn.style.display = stored.length > 0 ? "inline-block" : "none";
   }
@@ -1006,34 +1067,27 @@ function renderRecentlyPlayed() {
   stored.forEach((recentItem) => {
     const card = document.createElement("div");
     card.className = "square-card";
+
+    const resolvedCover = (recentItem.isDownloaded || recentItem.albumId === "DOWNLOADED")
+      ? OFFLINE_DOWNLOAD_COVER
+      : (recentItem.cover || DEFAULT_FALLBACK_COVER);
+
     card.innerHTML = `
       <div class="square-thumb">
-        <img src="${recentItem.cover}" alt="cover" onerror="this.src='assets/default-cover.png'">
+        <img src="${resolvedCover}" alt="cover" onerror="this.src='${DEFAULT_FALLBACK_COVER}'">
       </div>
       <strong>${recentItem.name}</strong>
-      <small>${recentItem.isLocal ? "Local" : (recentItem.albumName || "Drive")}</small>
+      <small>${recentItem.isLocal ? (recentItem.isDownloaded ? "Offline" : "Local") : (recentItem.albumName || "Drive")}</small>
     `;
     card.addEventListener("click", () => {
-      // CRITICAL FIX: Resolve fresh active local song or fallback to drive catalog
-      let resolvedSong = null;
-      if (recentItem.isLocal) {
-        resolvedSong = state.localSongs.find(s => s.id === recentItem.id || s.name === recentItem.name);
-      } else {
-        resolvedSong = state.allDriveSongs.find(s => s.id === recentItem.id);
-      }
+      const all = getAllCurrentSongs();
+      let match = all.find(s => s.id === recentItem.id || s.name === recentItem.name);
 
-      if (!resolvedSong) {
-        // Fallback search across everything
-        const allAvailable = [...state.localSongs, ...state.allDriveSongs];
-        resolvedSong = allAvailable.find(s => s.id === recentItem.id || s.name === recentItem.name);
-      }
-
-      if (resolvedSong) {
-        const all = [...state.localSongs, ...state.allDriveSongs];
-        state.queue = [resolvedSong, ...all.filter(s => s.id !== resolvedSong.id)];
+      if (match) {
+        state.queue = [match, ...all.filter(s => s.id !== match.id)];
         playSongAt(0);
       } else {
-        showCustomConfirm("File Not Found", `"${recentItem.name}" is no longer available in device storage.`, "OK", "⚠️");
+        showCustomConfirm("File Offline", `"${recentItem.name}" is not available in local storage.`, "OK", "⚠️");
       }
     });
     container.appendChild(card);
@@ -1054,7 +1108,7 @@ document.getElementById("clearRecentBtn")?.addEventListener("click", async () =>
 });
 
 // -----------------------------------------------------
-// LOCAL AUDIO UPLOAD
+// LOCAL AUDIO UPLOAD (Pick from Device)
 // -----------------------------------------------------
 const localFileInput = document.getElementById("localFileInput");
 
@@ -1080,7 +1134,8 @@ async function handleLocalFiles(files) {
       blob: file,
       cover: "assets/cover-local.png",
       albumName: "Device Files",
-      isLocal: true
+      isLocal: true,
+      isDownloaded: false
     };
 
     await saveLocalTrackToDB(record);
@@ -1092,7 +1147,7 @@ async function handleLocalFiles(files) {
   }
 
   renderFeaturedAlbumsDeck();
-  showStorageToast("Import Successful", `${validFiles.length} file(s) added to Device Files`, "📁");
+  showStorageToast("Import Successful", `${validFiles.length} file(s) imported`, "📁");
   openAlbumDetail("LOCAL");
 }
 
@@ -1102,7 +1157,7 @@ localFileInput?.addEventListener("change", (e) => {
 });
 
 // -----------------------------------------------------
-// AUDIO PLAYBACK ENGINE WITH AUTOMATIC FAIL-SAFE
+// AUDIO PLAYBACK ENGINE WITH DIRECT FAIL-SAFE
 // -----------------------------------------------------
 async function playSongAt(index) {
   if (!state.queue.length) return;
@@ -1112,35 +1167,11 @@ async function playSongAt(index) {
   audioEl.pause();
   audioEl.currentTime = 0;
 
-  // Resolve Play Source URL
   let playSourceUrl = song.url;
-  const isDownloaded = !!state.downloadedFilesRegistry[song.id];
+  const isDownloaded = !!state.downloadedFilesRegistry[song.id] || song.isDownloaded;
 
-  if (song.isLocal) {
-    // Ensure fresh blob URL for local songs
-    const liveLocal = state.localSongs.find(s => s.id === song.id || s.name === song.name);
-    if (liveLocal && liveLocal.url) {
-      playSourceUrl = liveLocal.url;
-    }
-  } else if (isDownloaded) {
-    if (state.downloadedFilesRegistry[song.id].blobUrl) {
-      playSourceUrl = state.downloadedFilesRegistry[song.id].blobUrl;
-    } else if (hasNativeFilesystem()) {
-      try {
-        const { Filesystem, Directory } = Capacitor.Plugins;
-        const fileUri = await Filesystem.getUri({
-          path: `DidodeMusic/${state.downloadedFilesRegistry[song.id].fileName}`,
-          directory: Directory.Documents
-        });
-        playSourceUrl = Capacitor.convertFileSrc(fileUri.uri);
-      } catch (e) {
-        console.warn("Local offline file failed:", e);
-      }
-    }
-  }
-
-  // If local file, do not fall back to Google Drive
-  const candidateUrls = song.isLocal
+  // Local & Downloaded tracks never fallback to external URLs to bypass rate limit blocks
+  const candidateUrls = (song.isLocal || isDownloaded)
     ? [playSourceUrl].filter(Boolean)
     : [
         playSourceUrl,
@@ -1157,10 +1188,10 @@ async function playSongAt(index) {
       state.isPlaying = false;
       updatePlayIcons();
       showCustomConfirm(
-        song.isLocal ? "Local Playback Error" : "Google Drive Playback Blocked",
+        song.isLocal ? "Playback Notice" : "Streaming Limit",
         song.isLocal 
-          ? `Could not play "${song.name}". Please re-upload or select the file from Device Files.` 
-          : `Google Drive has temporarily blocked direct streaming for "${song.name}" due to rate limits.`,
+          ? `Could not play "${song.name}". File might have been moved or deleted.`
+          : `Google Drive has temporarily blocked streaming for "${song.name}". Please download for offline listening.`,
         "Got It",
         "⚠️",
         true
@@ -1190,27 +1221,34 @@ async function playSongAt(index) {
 
   attemptPlayStream();
 
+  // Consistent Offline Artwork for Player Views
+  const currentCover = (isDownloaded || song.albumId === "DOWNLOADED")
+    ? OFFLINE_DOWNLOAD_COVER
+    : (song.cover || DEFAULT_FALLBACK_COVER);
+
   const heroArtwork = document.getElementById("heroArtwork");
   const fullArtwork = document.getElementById("fullArtwork");
   const dockedArtwork = document.getElementById("dockedArtwork");
   const heroAmbientGlow = document.getElementById("heroAmbientGlow");
 
-  if (heroArtwork) heroArtwork.src = song.cover;
-  if (fullArtwork) fullArtwork.src = song.cover;
-  if (dockedArtwork) dockedArtwork.src = song.cover;
+  if (heroArtwork) heroArtwork.src = currentCover;
+  if (fullArtwork) fullArtwork.src = currentCover;
+  if (dockedArtwork) dockedArtwork.src = currentCover;
 
   if (heroAmbientGlow) {
-    heroAmbientGlow.style.backgroundImage = `url('${song.cover}')`;
+    heroAmbientGlow.style.backgroundImage = `url('${currentCover}')`;
   }
 
+  const artistDisplay = song.isLocal ? (isDownloaded ? "Offline Download" : "Device File") : (song.albumName || "Drive Audio");
+
   document.getElementById("heroTrackTitle").textContent = song.name;
-  document.getElementById("heroTrackArtist").textContent = song.isLocal ? "Device File" : (song.albumName || "Drive Audio");
+  document.getElementById("heroTrackArtist").textContent = artistDisplay;
 
   document.getElementById("dockedTrackTitle").textContent = song.name;
-  document.getElementById("dockedTrackArtist").textContent = song.isLocal ? "Device File" : (song.albumName || "Drive Audio");
+  document.getElementById("dockedTrackArtist").textContent = artistDisplay;
 
   document.getElementById("fullTrackTitle").textContent = song.name;
-  document.getElementById("fullTrackArtist").textContent = song.isLocal ? "Device File" : (song.albumName || "Drive Audio");
+  document.getElementById("fullTrackArtist").textContent = artistDisplay;
   document.getElementById("fullPlayerSource").textContent = isDownloaded ? "Offline Storage" : (song.isLocal ? "Local Storage" : (song.albumName || "Drive Album"));
 
   updatePlayIcons();
@@ -1230,7 +1268,7 @@ function updateFullPlayerDownloadButton() {
   }
   btn.style.display = "flex";
 
-  const isDownloaded = !!state.downloadedFilesRegistry[currentSong.id];
+  const isDownloaded = !!state.downloadedFilesRegistry[currentSong.id] || currentSong.isDownloaded;
   const isCurrentlyLoading = state.activeDownloads.has(currentSong.id);
 
   btn.classList.toggle("is-loading", isCurrentlyLoading);
@@ -1470,7 +1508,7 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
     return;
   }
 
-  const allAvailable = [...state.allDriveSongs, ...state.localSongs];
+  const allAvailable = getAllCurrentSongs();
   const filtered = allAvailable.filter(s => s.name.toLowerCase().includes(q) || (s.albumName && s.albumName.toLowerCase().includes(q)));
 
   if (searchBox) searchBox.style.display = "block";
@@ -1492,50 +1530,36 @@ document.getElementById("searchInput")?.addEventListener("input", (e) => {
 });
 
 // -----------------------------------------------------
-// APP BOOTSTRAP & OFFLINE PRIORITY SYNC
+// APP BOOTSTRAP (OFFLINE FIRST PRIORITY)
 // -----------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
+  renderVisualizer();
+  updateRepeatUI();
+  setupHeroPlayerExpansion();
+
   try {
     await initDB();
-    
-    // 1. Load Local Uploads / Device Files from IndexedDB FIRST to build valid Blob URLs
-    const savedLocalTracks = await getAllLocalTracksFromDB();
-    if (savedLocalTracks && savedLocalTracks.length > 0) {
-      state.localSongs = savedLocalTracks.map(t => ({
+
+    // 1. Load Local Uploads from IndexedDB
+    const savedTracks = await getAllLocalTracksFromDB();
+    if (savedTracks && savedTracks.length > 0) {
+      state.localSongs = savedTracks.map(t => ({
         ...t,
         url: URL.createObjectURL(t.blob)
       }));
     }
-
-    // 2. Load Downloaded Offline Tracks from IndexedDB
-    const savedDownloadedTracks = await getDownloadedTracksFromDB();
-    if (savedDownloadedTracks && savedDownloadedTracks.length > 0) {
-      const registry = JSON.parse(localStorage.getItem("downloadRegistry") || "{}");
-      savedDownloadedTracks.forEach(track => {
-        if (track.blob) {
-          registry[track.id] = {
-            fileName: track.fileName,
-            filePath: `DidodeMusic/${track.fileName}`,
-            blobUrl: URL.createObjectURL(track.blob)
-          };
-        }
-      });
-      state.downloadedFilesRegistry = registry;
-      localStorage.setItem("downloadRegistry", JSON.stringify(registry));
-    }
-
   } catch (err) {
-    console.error("IndexedDB initialization error:", err);
+    console.error("IndexedDB bootstrap error:", err);
   }
 
-  renderVisualizer();
-  updateRepeatUI();
-  renderRecentlyPlayed();
-  setupHeroPlayerExpansion();
-
+  // 2. Load Native & Web Offline files before UI renders
   await syncPhysicalDownloadsState();
+
+  // 3. Render Offline UI Elements
+  renderRecentlyPlayed();
   renderFeaturedAlbumsDeck();
 
+  // 4. Online Discovery (If network is available)
   if (window.DRIVE_CONFIG && window.DRIVE_CONFIG.autoLoad) {
     fetchDriveAlbums();
   }
